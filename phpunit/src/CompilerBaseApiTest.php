@@ -1003,14 +1003,60 @@ sources:
   - main.php
 YAML);
 
-        $files = $this->invokeMethod('parseProjectYaml', $projectFile);
+        $files = $this->compiler->getFiles($projectFile);
         $entry = realpath(dirname($projectFile) . '/main.php');
 
         $this->assertSame([], $files);
         $this->assertSame($entry, $this->getPropertyValue('sapiEntryFile'));
         $this->assertSame([$entry], $this->getPropertyValue('embeddedFiles'));
         $this->assertSame([$entry], $this->getPropertyValue('embeddedPhpFiles'));
-        $this->invokeMethod('validateLoadedProjectConfiguration');
+    }
+
+    public function testEntryWithoutCliIsIgnoredAndRemainsAnAotSource(): void
+    {
+        $projectFile = $this->createProjectFile(<<<'YAML'
+sapi: embed
+entry: main.php
+sources:
+  - main.php
+YAML);
+        $entry = realpath(dirname($projectFile) . '/main.php');
+
+        $climate = $this->getPropertyValue('climate');
+        $climate->output->defaultTo('buffer');
+        $files = $this->compiler->getFiles($projectFile);
+        $output = $climate->output->get('buffer')->get();
+
+        $this->assertStringContainsString(
+            '`entry` is ignored because `sapi` does not contain cli',
+            $output,
+        );
+        $this->assertSame([$entry], $files);
+        $this->assertNull($this->getPropertyValue('sapiEntryFile'));
+        $this->assertSame([], $this->getPropertyValue('embeddedFiles'));
+        $this->assertSame([], $this->getPropertyValue('embeddedPhpFiles'));
+    }
+
+    public function testMissingEntryWithoutCliIsIgnoredBeforeFileValidation(): void
+    {
+        $projectFile = $this->createProjectFile(<<<'YAML'
+sapi: fpm
+php-builder: {}
+entry: missing.php
+sources:
+  - main.php
+YAML);
+        $climate = $this->getPropertyValue('climate');
+        $climate->output->defaultTo('buffer');
+
+        $files = $this->compiler->getFiles($projectFile);
+
+        $this->assertSame([realpath(dirname($projectFile) . '/main.php')], $files);
+        $this->assertStringContainsString(
+            '`entry` is ignored because `sapi` does not contain cli',
+            $climate->output->get('buffer')->get(),
+        );
+        $this->assertNull($this->getPropertyValue('sapiEntryFile'));
     }
 
     public function testCommandLineEntryConfiguresPhpBuilderCliSapi(): void

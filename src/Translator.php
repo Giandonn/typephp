@@ -4392,9 +4392,6 @@ CODE;
                 }
             }
         }
-        if ($this->sapiEntryFile !== null) {
-            $this->embeddedFiles[] = $this->sapiEntryFile;
-        }
         $this->embeddedFiles = array_values(array_unique($this->embeddedFiles));
         sort($this->embeddedFiles, SORT_STRING);
         $this->embeddedPhpFiles = array_values(array_filter(
@@ -4685,11 +4682,7 @@ CODE;
             $this->resourceConfig['manifest'] = $manifest;
         }
 
-        $list = $this->filterIgnoredFiles($list);
-        if ($this->sapiEntryFile !== null) {
-            $list = array_values(array_diff($list, [$this->sapiEntryFile]));
-        }
-        return $list;
+        return $this->filterIgnoredFiles($list);
     }
 
     private function configurePhpBuilder(PhpBuilderConfiguration $configuration): void
@@ -4707,21 +4700,12 @@ CODE;
             $this->error('`entry` must be a non-empty PHP file path');
         }
         $value = trim($value);
-        $entryPath = $this->resolvePath($value, $baseDirectory, 'Entry path');
-        $entry = realpath($entryPath);
-        if ($entry === false || !is_file($entry)) {
-            $this->error('Entry file does not exist: `' . $value . '`');
-        }
-        if (!FileScanner::isPhpFile($entry) || str_ends_with($entry, '.stub.php')) {
-            $this->error('`entry` must select an executable PHP file');
-        }
-        $this->sapiEntryFile = $entry;
-        if (!in_array($entry, $this->embeddedFiles, true)) {
-            $this->embeddedFiles[] = $entry;
-        }
-        if (!in_array($entry, $this->embeddedPhpFiles, true)) {
-            $this->embeddedPhpFiles[] = $entry;
-        }
+        // Existence and file-type checks are deliberately deferred until the
+        // final SAPI selection is known. Command-line --sapi may override YAML,
+        // and entry has no semantics unless that final selection contains CLI.
+        $this->sapiEntryConfiguredValue = $value;
+        $this->sapiEntryConfiguredPath = $this->resolvePath($value, $baseDirectory, 'Entry path');
+        $this->sapiEntryFile = null;
     }
 
     private function configureSapiTargets(string|array $value): void

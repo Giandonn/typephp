@@ -521,11 +521,33 @@ trait SourcePipelineTrait
         if ($this->isSapiBuild() && !$this->isPhpBuilderBuild()) {
             $this->error('The cli and fpm SAPIs require `php-builder`');
         }
-        if ($this->hasSapi('cli') && $this->sapiEntryFile === null) {
+        if ($this->hasSapi('cli') && $this->sapiEntryConfiguredPath === null) {
             $this->error('`sapi` containing cli requires an `entry` PHP file');
         }
-        if ($this->sapiEntryFile !== null && !$this->hasSapi('cli')) {
-            $this->error('`entry` requires `sapi` to contain cli');
+        if ($this->sapiEntryConfiguredPath !== null && !$this->hasSapi('cli')) {
+            $this->climate->warning('`entry` is ignored because `sapi` does not contain cli');
+            $this->sapiEntryFile = null;
+            $this->sapiEntryConfiguredPath = null;
+            $this->sapiEntryConfiguredValue = null;
+        }
+        if ($this->sapiEntryConfiguredPath !== null) {
+            $entry = realpath($this->sapiEntryConfiguredPath);
+            if ($entry === false || !is_file($entry)) {
+                $value = $this->sapiEntryConfiguredValue ?? $this->sapiEntryConfiguredPath;
+                $this->error('Entry file does not exist: `' . $value . '`');
+            }
+            if (!FileScanner::isPhpFile($entry) || str_ends_with($entry, '.stub.php')) {
+                $this->error('`entry` must select an executable PHP file');
+            }
+            $this->sapiEntryFile = $entry;
+            if (!in_array($this->sapiEntryFile, $this->embeddedFiles, true)) {
+                $this->embeddedFiles[] = $this->sapiEntryFile;
+                sort($this->embeddedFiles, SORT_STRING);
+            }
+            if (!in_array($this->sapiEntryFile, $this->embeddedPhpFiles, true)) {
+                $this->embeddedPhpFiles[] = $this->sapiEntryFile;
+                sort($this->embeddedPhpFiles, SORT_STRING);
+            }
         }
         if ($this->embeddedFiles !== [] && !$this->isBuildModeBin() && !$this->isSapiBuild()) {
             $this->error('`embedded-files` requires `mode: bin`');

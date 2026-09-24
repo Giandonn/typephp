@@ -563,8 +563,12 @@ class CompilerBase implements PropertyAccessContext
     /** @var list<string> */
     protected array $phpBuilderExtensions = [];
 
-    /** Absolute path of the embedded primary script used by the CLI SAPI. */
+    /** Canonical path of the active embedded primary script used by the CLI SAPI. */
     protected ?string $sapiEntryFile = null;
+    /** Resolved entry candidate awaiting validation against the final SAPI selection. */
+    protected ?string $sapiEntryConfiguredPath = null;
+    /** Original entry spelling retained for diagnostics. */
+    protected ?string $sapiEntryConfiguredValue = null;
     protected ?string $sapiPhpSourceDirectory = null;
     protected ?string $sapiPhpBuildDirectory = null;
     protected ?string $sapiPhpPrefix = null;
