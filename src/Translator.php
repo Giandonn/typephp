@@ -653,8 +653,8 @@ class Translator extends Preprocessor
         }
 
         if ($this->isNanoMode()) {
-            if (!$this->isBuildModeBin()) {
-                $this->error('--nano source composition only supports binary mode (-m bin)');
+            if ($this->isBuildModeExt()) {
+                $this->error('--nano source composition does not support extension mode (-m ext)');
             }
             if ($this->cxxStd !== 'c++17') {
                 $this->error('--nano requires the C++17 language standard');
@@ -2493,7 +2493,9 @@ CODE;
             'c' => $this->getCCompileCommandOptions(),
             default => $this->getNativeCompileCommandOptions($language),
         };
-        if ($this->isGeneratedProjectSource($sourceFile) && isset($options['forced_include'])) {
+        if (($this->isGeneratedProjectSource($sourceFile)
+                || isset($this->nanoRuntimeSources[$sourceFile]))
+            && isset($options['forced_include'])) {
             $values = $options->toArray();
             unset($values['forced_include']);
             return new CompileOptions($values);
@@ -3039,6 +3041,19 @@ CODE;
             $auditor->assertUndefinedSymbols(
                 'wasip2',
                 $this->captureNativeCommand([$nm, '--undefined-only', ...$objectFiles]),
+            );
+            return;
+        }
+        if ($this->isAndroidTarget()) {
+            $nm = getenv('TYPEPHP_ANDROID_NM');
+            if (!is_string($nm) || $nm === '') {
+                $compiler = $this->getCompilerBackend()->getCompilerCommand();
+                $candidate = dirname($compiler) . DIRECTORY_SEPARATOR . 'llvm-nm';
+                $nm = is_executable($candidate) ? $candidate : 'llvm-nm';
+            }
+            $auditor->assertUndefinedSymbols(
+                'android',
+                $this->captureNativeCommand([$nm, '--undefined-only', $targetFile]),
             );
             return;
         }

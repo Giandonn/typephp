@@ -79,6 +79,23 @@ final class NativeDependencyAuditorTest extends TestCase
         self::addToAssertionCount(1);
     }
 
+    public function testAndroidAllowsRequiredBionicAbiButStillRejectsNetwork(): void
+    {
+        $auditor = new NativeDependencyAuditor();
+        $auditor->assertUndefinedSymbols(
+            'android',
+            "                 U closelog\n"
+            . "                 U openlog\n"
+            . "                 U syscall\n"
+            . "                 U syslog\n",
+        );
+        self::addToAssertionCount(1);
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('socket');
+        $auditor->assertUndefinedSymbols('android', "                 U socket\n");
+    }
+
     public function testOnlyNonPosixExceptionsNeedAnAllowlistEntry(): void
     {
         self::assertContains('flock', NativeDependencyAuditor::NON_POSIX_HOST_FUNCTION_ALLOWLIST);

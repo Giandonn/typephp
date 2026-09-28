@@ -183,6 +183,20 @@ final class NativeBuildConfigurationTest extends TestCase
         self::assertSame(24, Android::getApiLevel('aarch64-linux-android24'));
     }
 
+    public function testAndroidNanoLibraryDoesNotRequirePrebuiltPhpSdk(): void
+    {
+        $compiler = $this->newCompiler(new Android());
+        $compiler->setBuildMode(\TypePhp\CompilerBase::BUILD_MODE_LIB);
+        $compiler->enableNanoForTest();
+
+        self::assertSame([], $compiler->getLibraryPathsForTest());
+        self::assertSame([], $compiler->getLibrariesForTest());
+        $defines = $compiler->getCommonCompileOptionsForTest()['user_defines'];
+        self::assertContains('PHPX_ANDROID=1', $defines);
+        self::assertContains('TYPEPHP_NO_MAIN=1', $defines);
+        self::assertContains('PHP_NANO=1', $defines);
+    }
+
     public function testNativeModulesDoNotFallBackToStaticPhpx(): void
     {
         $phpxDir = $this->temporaryDirectory('phpx-static-module');

@@ -15,6 +15,14 @@ final class NativeDependencyAuditor
         'flock',
     ];
 
+    /** Bionic/libc++ implementation imports required by an Android JNI library. */
+    public const array ANDROID_SYSTEM_ABI_ALLOWLIST = [
+        'closelog',
+        'openlog',
+        'syscall',
+        'syslog',
+    ];
+
     /** @param list<string> $flags */
     public function assertLinkFlags(string $target, array $flags): void
     {
@@ -79,6 +87,10 @@ final class NativeDependencyAuditor
             if ($symbol === 'proc_raise' || $symbol === 'sched_yield') {
                 return true;
             }
+        } elseif ($target === 'android'
+            && in_array($symbol, self::ANDROID_SYSTEM_ABI_ALLOWLIST, true)
+        ) {
+            return false;
         } elseif (in_array($symbol, self::NON_POSIX_HOST_FUNCTION_ALLOWLIST, true)) {
             return false;
         }

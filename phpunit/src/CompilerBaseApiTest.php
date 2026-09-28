@@ -1334,6 +1334,22 @@ YAML);
         $this->assertSame([dirname($projectFile) . '/build'], $this->compiler->getLinkPaths());
     }
 
+    public function testNanoModeSupportsLibraryBuildsButRejectsExtensions(): void
+    {
+        $this->setPropertyValue('nanoMode', true);
+        $this->setPropertyValue('buildMode', CompilerBase::BUILD_MODE_LIB);
+        $this->invokeMethod('applyCommandLineArguments');
+
+        $this->assertSame(CompilerBase::BUILD_MODE_LIB, $this->compiler->getBuildMode());
+
+        $this->setPropertyValue('buildMode', CompilerBase::BUILD_MODE_EXT);
+        $this->expectException(TestError::class);
+        $this->expectExceptionMessage(
+            '--nano source composition does not support extension mode (-m ext)',
+        );
+        $this->invokeMethod('applyCommandLineArguments');
+    }
+
     public function testParseProjectYamlFiltersIgnoredFilesFromReturnedSources(): void
     {
         $projectFile = $this->createProjectFile(<<<'YAML'
@@ -1684,6 +1700,32 @@ YAML);
             DIRECTORY_SEPARATOR . 'phpx-misc' . DIRECTORY_SEPARATOR . 'module_accessor' . DIRECTORY_SEPARATOR,
             $this->compiler->getObjectFile($entry),
         );
+    }
+
+    public function testNanoLibraryRuntimeEntryHasProjectSpecificCompileOptions(): void
+    {
+        $this->compiler->setTargetName('nano_module_accessor');
+        $this->setPropertyValue('buildMode', CompilerBase::BUILD_MODE_LIB);
+        $this->setPropertyValue('nanoMode', true);
+        $this->setPropertyValue('precompiledHeader', [
+            'header' => '/tmp/typephp_pch.hpp',
+            'artifact' => '/tmp/typephp_pch.hpp.gch',
+        ]);
+
+        $phpxDir = $this->invokeMethod('getPhpxDir');
+        $entry = $phpxDir . '/src/typephp/typephp_main_nano.cc';
+        $options = $this->invokeMethod('getSourceCompileCommandOptions', $entry, null);
+
+        $this->assertContains('TYPEPHP_PROJECT_NAME=nano_module_accessor', $options['user_defines']);
+        $this->assertContains('TYPEPHP_RUNTIME_EXPORTS=1', $options['user_defines']);
+        $this->assertArrayNotHasKey('forced_include', $options->toArray());
+        $this->assertArrayNotHasKey('precompiled_header', $options->toArray());
+        $this->assertFalse($this->compiler->hasMiscObjectFileCache($entry));
+
+        $nanoCore = dirname($phpxDir) . '/php-nano/src/core.cpp';
+        $this->setPropertyValue('nanoRuntimeSources', [$nanoCore => true]);
+        $coreOptions = $this->invokeMethod('getSourceCompileCommandOptions', $nanoCore, null);
+        $this->assertArrayNotHasKey('forced_include', $coreOptions->toArray());
     }
 
     public function testProjectIndependentMiscObjectsUseSharedCacheScope(): void

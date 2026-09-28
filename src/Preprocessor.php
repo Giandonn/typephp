@@ -434,7 +434,18 @@ class Preprocessor extends CompilerBase
     {
         $normalizedFile = str_replace('\\', '/', $file);
         $runtimeEntry = str_replace('\\', '/', $this->getPhpxDir() . '/src/misc/typephp_main.cc');
-        return $normalizedFile === $runtimeEntry;
+        if ($normalizedFile === $runtimeEntry) {
+            return true;
+        }
+        if (!$this->isNanoMode() || !$this->isBuildModeLib()) {
+            return false;
+        }
+        $nanoLibraryEntry = str_replace(
+            '\\',
+            '/',
+            $this->getPhpxDir() . '/src/typephp/typephp_main_nano.cc',
+        );
+        return $normalizedFile === $nanoLibraryEntry;
     }
 
     public function prepareFile(string $file): void

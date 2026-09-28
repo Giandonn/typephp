@@ -257,16 +257,21 @@ string(16) "Linux ..."
 > arguments, and must return `void`. Top-level executable statements are not
 > allowed; executable code belongs in a function or method.
 
-### VM-free Nano executable
+### VM-free Nano executables and libraries
 
-Use `--nano` to compile one PHP source file together with PHP Nano and PHPX
-sources. The result does not link `libphp` and contains no Zend opcode
-interpreter:
+Use `--nano` to compile PHP sources together with PHP Nano and PHPX sources.
+The result does not link `libphp` and contains no Zend opcode interpreter:
 
 ```bash
 ./bin/tpc.php --nano examples/hello.php
 ./hello
 ```
+
+Nano supports `mode: bin` and `mode: lib`. Binary mode generates the process
+`main()` entry and requires a TypePHP `main()` function. Library mode defines
+`TYPEPHP_NO_MAIN` and exports the project-specific runtime initialization and
+shutdown ABI for hosts such as an Android Activity. Nano does not support
+`mode: ext`.
 
 By default, the executable is emitted in the directory where `tpc` was invoked.
 Normal and Nano builds share the `build` directory for generated code, objects,

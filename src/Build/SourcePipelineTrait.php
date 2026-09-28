@@ -1228,7 +1228,7 @@ trait SourcePipelineTrait
             && ($this->isSapiBuild() || $this->embeddedFiles !== [] || $this->embeddedOpcodeFiles !== [])) {
             array_push($sourceFiles, ...$this->genEmbeddedOpcodeTable());
         }
-        if ($this->isNanoMode()) {
+        if ($this->isNanoMode() && $this->isBuildModeBin()) {
             $sourceFiles[] = $this->genNanoEntrypoint();
         }
         $this->getStableIdRegistry()->flush();
