@@ -171,6 +171,48 @@ runs:
         output="$("${smoke_binary}")"
         test "${output}" = '${{ inputs.smoke-output }}'
 
+    - name: Build and verify Apple Nano native applications
+      if: inputs.os == 'macos'
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        smoke_root='.github/smoke/macos'
+        nano_smoke="${smoke_root}/macos_nano_smoke"
+        ./tpc "${smoke_root}/project.yml" \
+          --nano \
+          --build-dir "${smoke_root}/nano-build" \
+          --output "${nano_smoke}" \
+          --job 2 \
+          --no-progress
+        test -x "${nano_smoke}"
+        test "$("${nano_smoke}")" = 'macos-arm64-smoke-ok:nts'
+        file "${nano_smoke}"
+        otool -L "${nano_smoke}"
+        if otool -L "${nano_smoke}" | grep -Eiq 'libphp|libphpx'; then
+          echo 'macOS Nano executable unexpectedly links a host PHP/PHPX library' >&2
+          exit 1
+        fi
+
+        ./tpc examples/apple-native/project.yml --nano --job 2 --no-progress
+        test -x examples/apple-native/typephp_macos_hello
+        file examples/apple-native/typephp_macos_hello
+        otool -L examples/apple-native/typephp_macos_hello
+
+        ./tpc examples/apple-native/ios-simulator.yml --nano --job 2 --no-progress
+        ios_simulator='examples/apple-native/typephp_ios_simulator_hello'
+        test -x "${ios_simulator}"
+        file "${ios_simulator}"
+        xcrun vtool -show-build "${ios_simulator}"
+        xcrun vtool -show-build "${ios_simulator}" | grep -Eq 'platform[[:space:]]+IOSSIMULATOR'
+
+        ./tpc examples/apple-native/ios.yml --nano --job 2 --no-progress
+        ios_device='examples/apple-native/typephp_ios_hello'
+        test -x "${ios_device}"
+        file "${ios_device}"
+        xcrun vtool -show-build "${ios_device}"
+        xcrun vtool -show-build "${ios_device}" | grep -Eq 'platform[[:space:]]+IOS$'
+
     - name: Show native dependencies
       shell: bash
       run: |
@@ -219,3 +261,9 @@ runs:
           .github/smoke/${{ inputs.smoke-directory }}/${{ inputs.smoke-binary }}
           .github/smoke/${{ inputs.smoke-directory }}/build/**/*.cc
           .github/smoke/${{ inputs.smoke-directory }}/build/**/*.h
+          .github/smoke/macos/macos_nano_smoke
+          .github/smoke/macos/nano-build/**/*.cc
+          .github/smoke/macos/nano-build/**/*.h
+          examples/apple-native/typephp_macos_hello
+          examples/apple-native/typephp_ios_simulator_hello
+          examples/apple-native/typephp_ios_hello
