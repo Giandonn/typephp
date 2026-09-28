@@ -1835,6 +1835,30 @@ CODE;
         // module_clean end
 
         $moduleName = $this->getModuleName();
+        $installNanoPolicyHandlers = $this->isNanoPolicyMode()
+            && !$this->isNanoMode()
+            && $this->isBuildModeBin()
+            && $this->hasSapi('embed');
+        if ($installNanoPolicyHandlers) {
+            // Windows Nano uses the full PHP runtime. Keep forbidden process
+            // functions in Zend's persistent table so shutdown boundaries stay
+            // intact, but replace their handlers before generated code runs.
+            // This path is binary/embed-only and executes once per process.
+            $code .= <<<'CODE'
+static void ZEND_FASTCALL typephp_nano_disabled_function(INTERNAL_FUNCTION_PARAMETERS) {
+    const zend_string *name = EX(func)->common.function_name;
+    zend_throw_error(nullptr, "Function `%s` is not supported in nano mode", name ? ZSTR_VAL(name) : "unknown");
+}
+
+static void typephp_disable_nano_function(const char *name, size_t name_length) {
+    auto *function = static_cast<zend_function *>(zend_hash_str_find_ptr(EG(function_table), name, name_length));
+    if (function != nullptr && function->type == ZEND_INTERNAL_FUNCTION) {
+        function->internal_function.handler = typephp_nano_disabled_function;
+    }
+}
+
+CODE;
+        }
         // rinit begin
         $code .= 'PHP_RINIT_FUNCTION(' . $moduleName . ') {' . PHP_EOL;
         $code .= 'if (UNEXPECTED(php_request_cache != nullptr)) {' . PHP_EOL;
@@ -1851,14 +1875,17 @@ CODE;
         $code .= $this->getIndent() . 'return FAILURE;' . PHP_EOL;
         $code .= '}' . PHP_EOL;
         $code .= 'php::request_init();' . PHP_EOL;
-        if ($this->isNanoPolicyMode() && !$this->isNanoMode()) {
+        if ($installNanoPolicyHandlers) {
             // The full Windows runtime still contains standard/process modules.
-            // Remove command functions from Zend's table after every module has
+            // Block command functions after every module has
             // started so variable functions and call_user_func cannot bypass
-            // the compile-time named-call check.
-            $code .= 'zend_disable_functions('
-                . $this->genCharPtr($this->getNanoPolicyDisabledFunctionList(), true)
-                . ');' . PHP_EOL;
+            // the compile-time named-call check. Replacing handlers preserves
+            // Zend's persistent function-table layout for embed shutdown.
+            foreach (explode(',', $this->getNanoPolicyDisabledFunctionList()) as $functionName) {
+                $functionArg = $this->genCharPtr($functionName, true);
+                $code .= 'typephp_disable_nano_function(' . $functionArg . ', '
+                    . strlen($functionName) . ');' . PHP_EOL;
+            }
         }
         $code .= 'module_init();' . PHP_EOL;
 

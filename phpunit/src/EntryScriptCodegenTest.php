@@ -49,6 +49,7 @@ PHP,
         );
         self::assertStringNotContainsString('php::eval("\\n', $extension);
         self::assertStringNotContainsString('zend_disable_functions(', $extension);
+        self::assertStringNotContainsString('typephp_disable_nano_function(', $extension);
     }
 
     public function testNanoEntrypointForwardsArgcAndArgvWithTheSharedContract(): void

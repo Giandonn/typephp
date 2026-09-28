@@ -156,9 +156,18 @@ final class NanoCapabilityPolicyTest extends BaseTest
             self::assertStringContainsString('php_main();', $extension);
             self::assertStringNotContainsString('php::eval(', $extension);
             self::assertStringContainsString(
-                'zend_disable_functions("exec,passthru,pcntl_exec,popen,proc_close,proc_get_status,proc_nice,proc_open,proc_terminate,shell_exec,system")',
+                'typephp_disable_nano_function("exec", 4);',
                 $extension,
             );
+            self::assertStringContainsString(
+                'function->internal_function.handler = typephp_nano_disabled_function;',
+                $extension,
+            );
+            self::assertStringContainsString(
+                'static void ZEND_FASTCALL typephp_nano_disabled_function(INTERNAL_FUNCTION_PARAMETERS)',
+                $extension,
+            );
+            self::assertStringNotContainsString('zend_disable_functions(', $extension);
             self::assertStringContainsString('_SERVER.item("SCRIPT_FILENAME", true)', $extension);
         } finally {
             $translator = $previousTranslator;
