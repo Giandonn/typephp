@@ -173,13 +173,6 @@ jobs:
       - name: Checkout TypePHP
         uses: actions/checkout@v4
 
-      - name: Checkout PHP Nano master
-        uses: actions/checkout@v4
-        with:
-          repository: swoole/php-nano
-          ref: master
-          path: php-nano
-
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:

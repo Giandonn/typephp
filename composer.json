@@ -29,7 +29,7 @@
     "phpunit/phpunit": "^10.4",
     "friendsofphp/php-cs-fixer": "^3.40",
     "phpstan/phpstan": "^2.2",
-    "swoole/php-nano": "^1.0.0"
+    "swoole/php-nano": "^1.0.2"
   },
   "autoload": {
     "psr-4": {
