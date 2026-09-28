@@ -3541,7 +3541,12 @@ CODE;
             // php_main() prototype — must be visible to this translation unit.
             // True Nano mode keeps php_main() encapsulated inside the separate
             // nano-entry translation unit, so only the policy path needs this.
-            if ($this->isNanoPolicyMode() && $this->hasFunction(self::ENTRY_FUNCTION)) {
+            if ($this->isNanoPolicyMode()
+                && !$this->isNanoMode()
+                && $this->isBuildModeBin()
+                && $this->hasSapi('embed')
+                && $this->hasFunction(self::ENTRY_FUNCTION)
+            ) {
                 $entryHeader = $this->declarationHeaderFiles[
                     $this->getFunction(self::ENTRY_FUNCTION)->sourceFile
                 ] ?? null;

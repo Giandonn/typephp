@@ -72,11 +72,16 @@ PHP);
         );
         $compiler->convert($files);
 
+        $extension = file_get_contents($this->projectDir . '/build/extension-nano_args.cc');
         $entrypoint = file_get_contents($this->projectDir . '/build/nano-entry-nano_args.cc');
+        $entryHeader = basename($compiler->getDeclarationHeaderFile($source));
+        self::assertIsString($extension);
+        self::assertStringNotContainsString("#include <{$entryHeader}>", $extension);
         self::assertStringContainsString(
             'php_main(php::global("argc").toInt(), php::global("argv").toArray())',
             $entrypoint,
         );
+        self::assertStringContainsString("#include <{$entryHeader}>", $entrypoint);
     }
 
     private function removeDirectory(string $directory): void

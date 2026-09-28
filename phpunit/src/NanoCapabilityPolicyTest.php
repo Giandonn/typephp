@@ -147,10 +147,12 @@ final class NanoCapabilityPolicyTest extends BaseTest
             $translator = $compiler;
             $compiler->addFiles([$source]);
             $compiler->prepareFile($source);
-            $compiler->convertFile($source);
-            $extension = file_get_contents($compiler->genExtension());
+            $compiler->convert([$source]);
+            $extension = file_get_contents($directory . '/build/extension-nano_policy_entry.cc');
+            $entryHeader = basename($compiler->getDeclarationHeaderFile($source));
 
             self::assertIsString($extension);
+            self::assertStringContainsString("#include <{$entryHeader}>", $extension);
             self::assertStringContainsString('php_main();', $extension);
             self::assertStringNotContainsString('php::eval(', $extension);
             self::assertStringContainsString(
