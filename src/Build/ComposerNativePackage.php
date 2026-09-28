@@ -258,8 +258,8 @@ final readonly class ComposerNativePackage
 
         $packageDirectory = substr($package, strlen('swoole/'));
         $candidates = [
-            $compilerRoot . '/vendor/swoole/' . $packageDirectory,
             $compilerRoot . '/' . $packageDirectory,
+            $compilerRoot . '/vendor/swoole/' . $packageDirectory,
             dirname($compilerRoot) . '/' . $packageDirectory,
         ];
         foreach ($candidates as $path) {

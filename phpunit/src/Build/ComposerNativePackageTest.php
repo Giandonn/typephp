@@ -24,10 +24,7 @@ final class ComposerNativePackageTest extends TestCase
     protected function tearDown(): void
     {
         InstalledVersions::reload($this->installedVersions);
-        @unlink($this->directory . '/src/example.c');
-        @unlink($this->directory . '/composer.json');
-        @rmdir($this->directory . '/src');
-        @rmdir($this->directory);
+        $this->removeDirectory($this->directory);
     }
 
     public function testLoadsStaticExtensionMetadata(): void
@@ -56,6 +53,23 @@ final class ComposerNativePackageTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('standard extension is built into');
         ComposerNativePackage::load('swoole/php-ext-standard');
+    }
+
+    public function testCompilerLocalPackageOverridesComposerVendorPackage(): void
+    {
+        $compilerRoot = $this->directory . '/compiler';
+        $vendorPackage = $compilerRoot . '/vendor/swoole/php-ext-example';
+        $localPackage = $compilerRoot . '/php-ext-example';
+        $this->writeFixturePackage($vendorPackage, 'vendor.c');
+        $this->writeFixturePackage($localPackage, 'local.c');
+
+        $package = ComposerNativePackage::load('swoole/php-ext-example', $compilerRoot);
+
+        self::assertSame(realpath($localPackage), $package->installPath);
+        self::assertSame(
+            [realpath($localPackage . '/src/local.c')],
+            $package->sources,
+        );
     }
 
     private function installFixture(bool $requireRuntime): void
@@ -105,5 +119,48 @@ final class ComposerNativePackageTest extends TestCase
                 ],
             ],
         ]);
+    }
+
+    private function writeFixturePackage(string $directory, string $source): void
+    {
+        mkdir($directory . '/src', 0777, true);
+        file_put_contents($directory . '/src/' . $source, 'int typephp_example(void) { return 1; }');
+        file_put_contents(
+            $directory . '/composer.json',
+            json_encode([
+                'name' => 'swoole/php-ext-example',
+                'require' => ['swoole/php-nano' => '^8.6@dev'],
+                'extra' => [
+                    'typephp-native' => [
+                        'kind' => 'extension',
+                        'abi' => 80600,
+                        'c-standard' => 11,
+                        'cxx-standard' => 17,
+                        'include-dirs' => ['src'],
+                        'sources' => ['src/' . $source],
+                        'extension' => [
+                            'name' => 'example',
+                            'module-entry' => 'example_module_entry',
+                        ],
+                    ],
+                ],
+            ], JSON_THROW_ON_ERROR),
+        );
+    }
+
+    private function removeDirectory(string $directory): void
+    {
+        if (!is_dir($directory)) {
+            return;
+        }
+        foreach (array_diff(scandir($directory), ['.', '..']) as $entry) {
+            $path = $directory . '/' . $entry;
+            if (is_dir($path)) {
+                $this->removeDirectory($path);
+            } else {
+                unlink($path);
+            }
+        }
+        rmdir($directory);
     }
 }
