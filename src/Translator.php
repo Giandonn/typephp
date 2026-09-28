@@ -1962,7 +1962,10 @@ CODE;
         $moduleVersion = $this->extensionVersion === ''
             ? 'nullptr'
             : $this->genCharPtr($this->extensionVersion, true);
-        if ($this->extensionVersion !== '' || $this->extensionInfo !== []) {
+        // Nano executables do not expose phpinfo(), and pulling the generated
+        // MINFO handler into the module would force every Nano runtime to link
+        // ext/standard/info.c solely for php_info_print_table_* symbols.
+        if (!$this->isNanoMode() && ($this->extensionVersion !== '' || $this->extensionInfo !== [])) {
             $moduleInfoFunction = 'PHP_MINFO(' . $moduleName . ')';
             $code .= PHP_EOL . 'PHP_MINFO_FUNCTION(' . $moduleName . ') {' . PHP_EOL;
             $code .= '    php_info_print_table_start();' . PHP_EOL;

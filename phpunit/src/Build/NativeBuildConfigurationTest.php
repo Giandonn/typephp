@@ -134,6 +134,17 @@ final class NativeBuildConfigurationTest extends TestCase
         );
     }
 
+    public function testIosNanoUsesDarwinDeadStripLinkerFlag(): void
+    {
+        $compiler = $this->newCompiler(new Ios());
+        $compiler->enableNanoForTest();
+
+        $options = $compiler->getLinkCommandOptionsForTest();
+
+        self::assertStringContainsString('-Wl,-dead_strip', $options['ldflags']);
+        self::assertStringNotContainsString('-Wl,--gc-sections', $options['ldflags']);
+    }
+
     public function testAndroidResolvesSelfContainedSdkAndSystemLibraries(): void
     {
         $phpxDir = $this->temporaryDirectory('phpx-android-host');
@@ -281,6 +292,11 @@ final class NativeBuildConfigurationTest extends TestCase
             public function getCommonCompileOptionsForTest(): array
             {
                 return $this->getCommonCompileCommandOptions()->toArray();
+            }
+
+            public function getLinkCommandOptionsForTest(): array
+            {
+                return $this->getLinkCommandOptions()->toArray();
             }
 
             public function enableNanoForTest(): void

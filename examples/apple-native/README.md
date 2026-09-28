@@ -6,36 +6,54 @@ application state and click behavior, while Objective-C++ only exposes small
 native UI operations. Clicking the native button returns a control ID to
 TypePHP, which updates the status label.
 
+All three Apple targets support Nano mode. The `tpc.php` compiler itself still
+runs dynamically on the host PHP and loads its Composer dependencies; `--nano`
+only changes the generated native application. A Nano application compiles the
+selected php-nano and PHPX sources directly and does not link a host `libphp` or
+an iOS PHP/PHPX SDK archive.
+
 ## macOS
 
 Requirements:
 
 - macOS with Xcode Command Line Tools
-- PHP 8.4 or 8.5 built with the embed SAPI (`libphp.dylib`)
-- a matching PHPX build
+- PHP 8.4 or 8.5 CLI for running `tpc.php`
+- the compiler Composer dependencies, including php-nano and PHPX sources
 - `PHPX_HOME` pointing to the PHPX source tree
 
 Build from the TypePHP repository root:
 
 ```sh
 export PHPX_HOME=/path/to/phpx
-php bin/tpc.php examples/objective-c-macos/project.yml --no-progress
+php bin/tpc.php examples/apple-native/project.yml --nano --no-progress
 ```
 
 Run the native executable:
 
 ```sh
-./examples/objective-c-macos/typephp_macos_hello
+./examples/apple-native/typephp_macos_hello
 ```
 
 To create a standard `.app` bundle that can be launched from Finder:
 
 ```sh
-sh examples/objective-c-macos/package-app.sh
-open "examples/objective-c-macos/dist/TypePHP macOS Hello.app"
+sh examples/apple-native/package-app.sh
+open "examples/apple-native/dist/TypePHP macOS Hello.app"
 ```
 
 ## iPhoneOS (physical iPhone)
+
+For a Nano build, only full Xcode and the Composer source dependencies are
+needed for compilation; the dedicated `iphoneos-arm64` PHP/PHPX SDK described
+below is required only by the non-Nano build:
+
+```sh
+export PHPX_HOME=/path/to/phpx
+sh examples/apple-native/build-ios.sh device --nano
+```
+
+Packaging and installing on a physical iPhone still requires a valid Apple
+Development identity and provisioning profile.
 
 The iPhone build is cross-compiled on macOS. It requires full Xcode (Command
 Line Tools alone do not contain the iPhoneOS SDK), an Apple Development signing
@@ -122,6 +140,19 @@ xcrun devicectl device install app \
 ```
 
 ## iOS Simulator (Apple silicon)
+
+Nano mode does not need simulator PHP/PHPX archives. On Apple silicon, build,
+package, install and launch it with:
+
+```sh
+export PHPX_HOME=/path/to/phpx
+sh examples/apple-native/build-ios.sh simulator --nano
+xcrun simctl install booted 'examples/apple-native/dist/TypePHP iOS Simulator Hello.app'
+xcrun simctl launch booted org.swoole.typephp.ios-simulator-hello
+```
+
+The separate simulator SDK described below is required only by the non-Nano
+build.
 
 The simulator needs archives compiled for `arm64-apple-ios-simulator`.
 The physical iPhone SDK above cannot be reused. Build the separate runtime

@@ -187,7 +187,9 @@ trait NativeCommandOptionsTrait
             $ldflags = trim('-static -B ' . escapeshellarg($this->getFullStaticMuslDir()) . ' ' . $ldflags);
         }
         if ($this->isNanoMode()) {
-            $gcSections = $this->isMacos() ? '-Wl,-dead_strip' : '-Wl,--gc-sections';
+            $gcSections = ($this->isMacos() || $this->isIosTarget())
+                ? '-Wl,-dead_strip'
+                : '-Wl,--gc-sections';
             $ldflags = trim($gcSections . ' ' . $ldflags);
             if ($this->isWasiTarget()) {
                 $ldflags = trim(

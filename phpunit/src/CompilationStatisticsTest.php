@@ -178,6 +178,30 @@ final class CompilationStatisticsTest extends BaseTest
         self::assertStringNotContainsString('date_module_entry', $registry);
     }
 
+    public function testNanoSplCompositionIncludesItsNativeLinkDependencies(): void
+    {
+        $statistics = new CompilationStatistics();
+        $statistics->begin();
+        $statistics->record(CompilationStatistics::CLASSES, 'ArrayObject');
+        $statistics->finish();
+
+        $composition = (new NanoSourceComposer(TYPEPHP_ROOT_PATH))->compose(
+            sys_get_temp_dir() . '/typephp-nano-spl-dependencies-test',
+            'spl_dependencies_test',
+            false,
+            $statistics,
+        );
+
+        self::assertSame(['json', 'spl'], $composition['selection']->extensions);
+        self::assertContains('PHP_NANO_STANDARD_VAR=1', $composition['defines']);
+        self::assertTrue($this->containsSource($composition['packageSources'], 'ext/pcre/php_pcre.c'));
+        self::assertTrue($this->containsSource($composition['packageSources'], 'ext/standard/var.c'));
+        self::assertTrue($this->containsSource($composition['packageSources'], 'ext/standard/var_unserializer.c'));
+        $registry = file_get_contents($composition['registry']);
+        self::assertStringContainsString('pcre_module_entry', $registry);
+        self::assertStringContainsString('spl_module_entry', $registry);
+    }
+
     public function testNanoComposerAlwaysIncludesSharedStandardSources(): void
     {
         $statistics = new CompilationStatistics();

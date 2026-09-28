@@ -752,6 +752,39 @@ YAML);
         );
     }
 
+    public function testNanoBuildDoesNotGeneratePhpInfoHandlerForProjectMetadata(): void
+    {
+        global $translator;
+        $translator = $this->compiler;
+        $this->setPropertyValue('nanoMode', true);
+        $projectFile = $this->createProjectFile(<<<'YAML'
+name: nano_metadata_demo
+sources:
+  - main.php
+version: 2.4.1
+info:
+  Maintainer: TypePHP Team
+YAML);
+        $files = $this->invokeMethod('parseProjectYaml', $projectFile);
+        $this->compiler->addFiles($files);
+        foreach ($files as $file) {
+            $this->compiler->prepareFile($file);
+            $this->compiler->convertFile($file);
+        }
+
+        $extension = file_get_contents($this->compiler->genExtension());
+
+        $this->assertStringNotContainsString('PHP_MINFO_FUNCTION(nano_metadata_demo)', $extension);
+        $this->assertStringNotContainsString('php_info_print_table_', $extension);
+        $this->assertStringContainsString(
+            "    PHP_RSHUTDOWN(typephp_nano_metadata_demo),\n"
+            . "    nullptr,\n"
+            . "    \"2.4.1\",\n"
+            . '    STANDARD_MODULE_PROPERTIES,',
+            $extension,
+        );
+    }
+
     public function testExtensionWithoutMetadataKeepsNullInfoAndVersion(): void
     {
         global $translator;

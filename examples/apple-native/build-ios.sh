@@ -20,13 +20,26 @@ case "${1:-}" in
         package_script=package-ios-simulator-app.sh
         ;;
     *)
-        echo "Usage: $0 <device|simulator>" >&2
+        echo "Usage: $0 <device|simulator> [--nano]" >&2
+        exit 2
+        ;;
+esac
+
+case "${2:-}" in
+    "") nano_arg= ;;
+    --nano) nano_arg=--nano ;;
+    *)
+        echo "Usage: $0 <device|simulator> [--nano]" >&2
         exit 2
         ;;
 esac
 
 cd "$repo_dir"
-php bin/tpc.php "examples/apple-native/$config" --no-progress
+if [ -n "$nano_arg" ]; then
+    php bin/tpc.php "examples/apple-native/$config" "$nano_arg" --no-progress
+else
+    php bin/tpc.php "examples/apple-native/$config" --no-progress
+fi
 
 if [ "$package_script" = package-ios-app.sh ] &&
     { [ -z "${TYPEPHP_IOS_PROVISIONING_PROFILE:-}" ] || [ -z "${TYPEPHP_IOS_CODE_SIGN_IDENTITY:-}" ]; }; then
