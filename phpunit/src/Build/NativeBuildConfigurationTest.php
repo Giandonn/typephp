@@ -115,6 +115,25 @@ final class NativeBuildConfigurationTest extends TestCase
         }
     }
 
+    public function testAppleNanoKeepsDarwinSdkTypesVisibleUnderPosixProfile(): void
+    {
+        foreach ([new Macos(), new Ios()] as $platform) {
+            $compiler = $this->newCompiler($platform);
+            $compiler->enableNanoForTest();
+            $defines = $compiler->getCommonCompileOptionsForTest()['user_defines'];
+
+            self::assertContains('_POSIX_C_SOURCE=200809L', $defines);
+            self::assertContains('_DARWIN_C_SOURCE=1', $defines);
+        }
+
+        $compiler = $this->newCompiler(new Linux());
+        $compiler->enableNanoForTest();
+        self::assertNotContains(
+            '_DARWIN_C_SOURCE=1',
+            $compiler->getCommonCompileOptionsForTest()['user_defines'],
+        );
+    }
+
     public function testAndroidResolvesSelfContainedSdkAndSystemLibraries(): void
     {
         $phpxDir = $this->temporaryDirectory('phpx-android-host');
@@ -262,6 +281,11 @@ final class NativeBuildConfigurationTest extends TestCase
             public function getCommonCompileOptionsForTest(): array
             {
                 return $this->getCommonCompileCommandOptions()->toArray();
+            }
+
+            public function enableNanoForTest(): void
+            {
+                $this->nanoMode = true;
             }
         };
 

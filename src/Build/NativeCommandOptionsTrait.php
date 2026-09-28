@@ -41,6 +41,12 @@ trait NativeCommandOptionsTrait
                 'PHPX_NANO=1',
                 '_POSIX_C_SOURCE=200809L',
             );
+            if ($this->isMacos() || $this->isIosTarget()) {
+                // A strict POSIX feature profile hides Darwin's BSD integer
+                // aliases (u_int/u_char/u_short), which are still used by
+                // public macOS and iOS SDK headers such as sys/sysctl.h.
+                $userDefines[] = '_DARWIN_C_SOURCE=1';
+            }
             array_push($userDefines, ...$this->nanoRuntimeDefines);
             if ($this->isWasiTarget()) {
                 $userDefines[] = 'ZEND_MM_ERROR=0';

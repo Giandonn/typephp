@@ -111,6 +111,7 @@ final class NativeSourceProjectBuilder
                 '-DPHP_NANO=1',
                 '-DPHPX_NANO=1',
                 '-D_POSIX_C_SOURCE=200809L',
+                ...(PHP_OS_FAMILY === 'Darwin' ? ['-D_DARWIN_C_SOURCE=1'] : []),
                 ...array_map(
                     static fn(string $define): string => '-D' . $define,
                     $composition['defines'],
