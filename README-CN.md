@@ -252,8 +252,8 @@ C++17 与 POSIX.1-2008，但依然不提供 socket、DNS、网络、远程 strea
 所有平台的 `--nano` 都会拒绝 `eval`、`include`、`include_once`、`require`、
 `require_once` 等 VM 入口以及匿名类。
 
-Windows 的差异在于构建后端：即使指定 `--nano`，也仍走原有的宿主机编译、链接
-流程，通过 import library 连接 `php.dll` 与 `phpx.dll`。Windows 不加载
+Windows 通过独立构建后端支持 `mode: bin` 和 `mode: lib` 的 Nano 原生应用：它仍走
+宿主机编译、链接流程，通过 import library 连接 `php.dll` 与 `phpx.dll`。Windows 不加载
 `swoole/php-nano`、`swoole/phpx` 的源码清单，也不会把它们的 C/C++ 源文件加入
 项目 `sources`。外部命令 API 与反引号语法依然会被拒绝；请求启动时还会从 Zend
 函数表移除这些命令函数，避免变量函数或回调形式绕过编译期检查。

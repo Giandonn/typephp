@@ -287,9 +287,10 @@ that target are compile-time errors.
 On every platform, `--nano` rejects the VM entry paths `eval`, `include`,
 `include_once`, `require`, and `require_once`, as well as anonymous classes.
 
-Windows uses a different build backend even when `--nano` is specified: it keeps
-the existing host compile/link pipeline and connects to `php.dll` and `phpx.dll`
-through their import libraries. It does not load the `swoole/php-nano` or
+Windows supports Nano native applications in `mode: bin` and `mode: lib` through
+a different build backend: it keeps the existing host compile/link pipeline and
+connects to `php.dll` and `phpx.dll` through their import libraries. It does not
+load the `swoole/php-nano` or
 `swoole/phpx` source manifests, nor append their C/C++ files to project `sources`.
 External-command APIs and backtick syntax are still rejected. Those command
 functions are also removed from the Zend function table at request startup, so

@@ -449,7 +449,7 @@ class Translator extends Preprocessor
             ['--march <arch>', 'Target CPU instruction set (for example native or armv8-a)'],
             ['--target-platform <triple>', 'Cross-compilation target triple'],
             ['--wasm[=browser|component]', 'Build WASI component (default) or browser output'],
-            ['--nano', 'Use the Nano policy and php-nano runtime outside Windows'],
+            ['--nano', 'Build a Nano application (Windows uses the PHP/PHPX DLL backend)'],
             ['--full-static', 'Link fully statically against the bundled SDK'],
             ['--lto', 'Enable Link Time Optimization (-flto)'],
             ['--no-literal-strings', 'Disable literal string optimization'],
@@ -493,12 +493,12 @@ class Translator extends Preprocessor
             $this->downloadProxy = $proxy;
         }
 
-        // The Nano syntax policy is platform-independent. On non-Windows hosts
-        // only the runtime source and link inputs change; argument parsing,
-        // translation, compilation scheduling and diagnostics remain shared.
+        // The Nano syntax policy is platform-independent. Windows produces a
+        // native application through the PHP/PHPX DLL backend; other targets
+        // compose the php-nano runtime sources into the artifact.
         if ($this->climate->arguments->defined('nano')) {
             $this->nanoPolicyMode = true;
-            if (NanoBuildBackend::composesRuntimeSources(PHP_OS_FAMILY)) {
+            if (NanoBuildBackend::composesRuntimeSources($this->getPlatform()->getName())) {
                 $this->nanoMode = true;
                 $this->noLiteralStrings = true;
             }
@@ -652,15 +652,18 @@ class Translator extends Preprocessor
             $this->linkPaths = $this->parseRepeatableArgv(['-L', '--link-path']);
         }
 
-        if ($this->isNanoMode()) {
+        if ($this->isNanoPolicyMode()) {
             if ($this->isBuildModeExt()) {
-                $this->error('--nano source composition does not support extension mode (-m ext)');
+                $this->error('--nano does not support extension mode (-m ext)');
             }
             if ($this->cxxStd !== 'c++17') {
                 $this->error('--nano requires the C++17 language standard');
             }
             if ($this->fullStatic) {
-                $this->error('--nano already composes its runtime sources; --full-static is not applicable');
+                $message = $this->isNanoMode()
+                    ? '--nano already composes its runtime sources; --full-static is not applicable'
+                    : '--nano on Windows uses the PHP/PHPX DLL backend; --full-static is not supported';
+                $this->error($message);
             }
             // Nano applications may consume target-owned static libraries.
             // The final executable dependency audit remains the authority on
@@ -763,7 +766,7 @@ class Translator extends Preprocessor
             return;
         }
 
-        $this->climate->warning($source . ' requested but clang-format not found, skipping formatting');
+        $this->climate->out($source . ' requested but clang-format not found, skipping formatting');
     }
 
     protected function formatCppCode(string $file): void
@@ -889,7 +892,7 @@ class Translator extends Preprocessor
             );
         } catch (\Exception $e) {
             // Fall back to the legacy logic if initialization fails
-            $this->climate->warning(
+            $this->climate->out(
                 "Failed to initialize new architecture: {$e->getMessage()}. Using legacy mode."
             );
             $this->platform = null;
@@ -1735,8 +1738,8 @@ CODE;
         $code .= $this->genCompiledGeneratorFingerprintRegistration();
         $code .= '// register constants' . PHP_EOL;
         foreach ($this->constants as $name => $const) {
-            $initializationCode = $const->initializationCode ?? '';
-            $afterInitializationCode = $const->afterInitializationCode ?? '';
+            $initializationCode = $const->initializationCode;
+            $afterInitializationCode = $const->afterInitializationCode;
             $scopedInitialization = $initializationCode !== '' || $afterInitializationCode !== '';
             if ($scopedInitialization) {
                 // Each constant has its own temporary namespace. Declaration
@@ -2592,7 +2595,7 @@ CODE;
             return $this->compileWithProcessPool($sourceFiles, $this->maxJob);
         }
 
-        $this->climate->warning(
+        $this->climate->out(
             'proc_open/proc_get_status unavailable, using sequential compilation',
         );
         return $this->compileSourceFile($sourceFiles);
@@ -2677,7 +2680,7 @@ CODE;
             // PCH is an optimization. A compiler-specific failure must not make
             // an otherwise valid TypePHP project unbuildable.
             $this->precompiledHeader = null;
-            $this->climate->warning('[pch] disabled: ' . $e->getMessage());
+            $this->climate->out('[pch] disabled: ' . $e->getMessage());
         }
     }
 

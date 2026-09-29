@@ -105,7 +105,7 @@ trait ResourceCompilationTrait
             }
             $this->climate->green('Resource compiled: ' . $resFile);
         } else {
-            $this->climate->warning('Resource files are only supported with MSVC backend on Windows');
+            $this->climate->out('Resource files are only supported with MSVC backend on Windows');
         }
     }
 }

@@ -358,7 +358,7 @@ trait SourcePipelineTrait
         $progress = $this->startOpcodeProgress('Opcodes', $batch->pendingCount());
         $blobs = $generator->compile(
             $batch,
-            fn (string $file) => $this->climate->warning(
+            fn (string $file) => $this->climate->out(
                 'Skipping non-executable embedded PHP file: ' . $file,
             ),
             fn (int $completed, int $total, string $file) => $this->updateOpcodeProgress(
@@ -525,7 +525,7 @@ trait SourcePipelineTrait
             $this->error('`sapi` containing cli requires an `entry` PHP file');
         }
         if ($this->sapiEntryConfiguredPath !== null && !$this->hasSapi('cli')) {
-            $this->climate->warning('`entry` is ignored because `sapi` does not contain cli');
+            $this->climate->out('`entry` is ignored because `sapi` does not contain cli');
             $this->sapiEntryFile = null;
             $this->sapiEntryConfiguredPath = null;
             $this->sapiEntryConfiguredValue = null;
@@ -699,7 +699,7 @@ trait SourcePipelineTrait
                     }
                     $this->error($detail);
                 }
-                $this->climate->warning($message['warning']);
+                $this->climate->out($message['warning']);
                 if (!empty($message['info'])) {
                     $this->climate->info($message['info']);
                 }

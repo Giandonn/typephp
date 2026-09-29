@@ -47,6 +47,7 @@ final class NanoSyntaxValidationVisitor extends NodeVisitorAbstract
                 Node\Expr\Include_::TYPE_INCLUDE_ONCE => 'include_once',
                 Node\Expr\Include_::TYPE_REQUIRE => 'require',
                 Node\Expr\Include_::TYPE_REQUIRE_ONCE => 'require_once',
+                default => ($this->fatal)($node, 'Invalid include expression type'),
             };
             ($this->fatal)($node, "`{$keyword}` is not supported in nano mode");
         }

@@ -1344,9 +1344,46 @@ YAML);
 
         $this->setPropertyValue('buildMode', CompilerBase::BUILD_MODE_EXT);
         $this->expectException(TestError::class);
-        $this->expectExceptionMessage(
-            '--nano source composition does not support extension mode (-m ext)',
-        );
+        $this->expectExceptionMessage('--nano does not support extension mode (-m ext)');
+        $this->invokeMethod('applyCommandLineArguments');
+    }
+
+    public function testWindowsNanoUsesNativeDllBackendAndRejectsExtensionMode(): void
+    {
+        global $argv;
+        $argv = ['compiler.php', '--nano'];
+        $compiler = CompilerTest::create($this->testDir);
+        $reflection = new \ReflectionClass($compiler);
+
+        $platform = $reflection->getProperty('platform');
+        $platform->setAccessible(true);
+        $platform->setValue($compiler, new Windows());
+
+        $apply = $reflection->getMethod('applyCommandLineArguments');
+        $apply->setAccessible(true);
+        $apply->invoke($compiler);
+
+        self::assertTrue($compiler->isNanoPolicyMode());
+        self::assertFalse($compiler->isNanoMode());
+
+        $buildMode = $reflection->getProperty('buildMode');
+        $buildMode->setAccessible(true);
+        $buildMode->setValue($compiler, CompilerBase::BUILD_MODE_EXT);
+
+        $this->expectException(TestError::class);
+        $this->expectExceptionMessage('--nano does not support extension mode (-m ext)');
+        $apply->invoke($compiler);
+    }
+
+    public function testWindowsNanoRequiresCxx17(): void
+    {
+        $this->setPropertyValue('nanoPolicyMode', true);
+        $this->setPropertyValue('nanoMode', false);
+        $this->setPropertyValue('platform', new Windows());
+        $this->setPropertyValue('cxxStd', 'c++20');
+
+        $this->expectException(TestError::class);
+        $this->expectExceptionMessage('--nano requires the C++17 language standard');
         $this->invokeMethod('applyCommandLineArguments');
     }
 

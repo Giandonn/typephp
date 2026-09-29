@@ -2,22 +2,22 @@
 
 namespace TypePhp\Build;
 
-/** Selects the runtime build backend used by the --nano policy mode. */
+/** Selects the runtime build backend used by a --nano native application. */
 final class NanoBuildBackend
 {
-    /** Existing Windows host build linked through the PHP/PHPX import libraries. */
+    /** Windows native application linked through the PHP/PHPX import libraries. */
     public const WINDOWS_DLL = 'windows-dll';
 
     /** Composer package manifests whose C/C++ sources are compiled into the program. */
     public const COMPOSER_SOURCES = 'composer-sources';
 
-    public static function forHost(string $osFamily): string
+    public static function forHost(string $platformName): string
     {
-        return $osFamily === 'Windows' ? self::WINDOWS_DLL : self::COMPOSER_SOURCES;
+        return $platformName === 'Windows' ? self::WINDOWS_DLL : self::COMPOSER_SOURCES;
     }
 
-    public static function composesRuntimeSources(string $osFamily): bool
+    public static function composesRuntimeSources(string $platformName): bool
     {
-        return self::forHost($osFamily) === self::COMPOSER_SOURCES;
+        return self::forHost($platformName) === self::COMPOSER_SOURCES;
     }
 }

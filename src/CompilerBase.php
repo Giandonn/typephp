@@ -14,7 +14,6 @@ use PhpParser\Node;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\CallLike;
 use PhpParser\Node\Expr\Variable;
-use PhpParser\Node\FunctionLike;
 use PhpParser\NodeAbstract;
 use PhpParser\Parser;
 use PhpParser\ParserFactory;
@@ -39,6 +38,7 @@ use TypePhp\Entity\ArgInfo;
 use TypePhp\Entity\ClassDef;
 use TypePhp\Entity\ConstantDef;
 use TypePhp\Entity\FunctionDef;
+use TypePhp\Entity\GlobalConstantDef;
 use TypePhp\Entity\InterfaceDef;
 use TypePhp\Entity\MethodDef;
 use TypePhp\Entity\PropertyDef;
@@ -103,8 +103,36 @@ use TypePhp\TypeSystem\CompositeTypeCheckerTrait;
 use TypePhp\TypeSystem\CompoundTypeDeclarationValidationTrait;
 use TypePhp\TypeSystem\NativeTypeCompatibilityTrait;
 
-class CompilerBase implements PropertyAccessContext
+abstract class CompilerBase implements PropertyAccessContext
 {
+    abstract protected function genDefaultArgumentExpr(string $nativeName, int $argumentIndex): string;
+
+    abstract protected function getFunctionOptimizationAttribute(FunctionDef $function): string;
+
+    abstract protected function findClassMethodDef(
+        ClassDef $classDef,
+        string $methodName,
+        bool $includeAbstract = true,
+    ): ?MethodDef;
+
+    abstract protected function validateMethodOverrideSignature(
+        NodeAbstract $v,
+        string $methodName,
+        MethodDef $childMethodDef,
+        MethodDef $parentMethodDef,
+        string $parentClass,
+        ?string $childClass = null,
+    ): void;
+
+    abstract public function getClassConstValue(
+        NodeAbstract $expr,
+        string $class,
+        string $name,
+        string $currentClass = '',
+    ): mixed;
+
+    abstract protected function genArgumentDeclaration(ArgInfo $argInfo): string;
+
     use CompositeTypeCheckerTrait;
     use CompoundTypeDeclarationValidationTrait;
     use CompilerDiagnosticTrait;
@@ -619,7 +647,7 @@ class CompilerBase implements PropertyAccessContext
     protected string $interface = '';
 
     /**
-     * @var array<string, ConstantDef>
+     * @var array<string, GlobalConstantDef>
      */
     protected array $constants = [];
 
@@ -729,8 +757,7 @@ class CompilerBase implements PropertyAccessContext
     protected array $classMethodOverride = [];
 
     /**
-     * Stores all class inheritance relationships. Class names must be all lowercase.
-     * @var array<string, string>
+     * Stores compiler symbols collected during preprocessing.
      */
     protected SymbolRepository $symbols;
 
@@ -1026,9 +1053,10 @@ class CompilerBase implements PropertyAccessContext
         }
     }
 
-    public function isScalarInt(Expr $expr): bool
+    /** @phpstan-assert-if-true Node\Scalar\Int_ $expr */
+    public function isScalarInt(Node $expr): bool
     {
-        return $expr instanceof Node\Scalar\LNumber;
+        return $expr instanceof Node\Scalar\Int_;
     }
 
     public function getLine($node): int
@@ -1425,7 +1453,7 @@ class CompilerBase implements PropertyAccessContext
         $this->namespace = '';
     }
 
-    protected function getFunctionName(FunctionLike $v): string
+    protected function getFunctionName(Node\Stmt\Function_|Node\Stmt\ClassMethod $v): string
     {
         if ($this->methodDef !== null && $this->classDef !== null) {
             return $this->getNativeName(
@@ -1899,30 +1927,29 @@ class CompilerBase implements PropertyAccessContext
 
     protected function parseScalar(Node\Scalar $expr): string
     {
-        $type = $expr->getType();
-        switch ($type) {
-            case 'Scalar_Int':
-                if ($this->bigintTypes) {
-                    return 'php::toBigInt(' . $expr->value . ')';
-                }
-                return $expr->value . $this->getPlatform()->getIntegerLiteralSuffix();
-            case 'Scalar_Float':
-                if ($this->isBigIntLiteral($expr)) {
-                    return 'php::toBigInt(' . $this->getLiteralString($this->getBigIntLiteralString($expr)) . ')';
-                }
-                if ($this->isDecimalLiteral($expr) || $this->decimalTypes) {
-                    $rawValue = $expr->getAttribute('rawValue');
-                    $clean = $rawValue !== null ? $this->stripNumericUnderscores($rawValue) : (string) $expr->value;
-                    return 'php::toDecimal(' . $this->getLiteralString($clean) . ')';
-                }
-                return $this->parseScalarFloat($expr);
-            case 'Scalar_String':
-                return $expr->hasAttribute('noLiteralString') ? $this->getInlineString($expr->value) : $this->getLiteralString($expr->value);
-            default:
-                $this->unsupportedSyntax($expr);
-                break;
+        if ($expr instanceof Node\Scalar\Int_) {
+            if ($this->bigintTypes) {
+                return 'php::toBigInt(' . $expr->value . ')';
+            }
+            return $expr->value . $this->getPlatform()->getIntegerLiteralSuffix();
         }
-        return '';
+        if ($expr instanceof Node\Scalar\Float_) {
+            if ($this->isBigIntLiteral($expr)) {
+                return 'php::toBigInt(' . $this->getLiteralString($this->getBigIntLiteralString($expr)) . ')';
+            }
+            if ($this->isDecimalLiteral($expr) || $this->decimalTypes) {
+                $rawValue = $expr->getAttribute('rawValue');
+                $clean = $rawValue !== null ? $this->stripNumericUnderscores($rawValue) : (string) $expr->value;
+                return 'php::toDecimal(' . $this->getLiteralString($clean) . ')';
+            }
+            return $this->parseScalarFloat($expr);
+        }
+        if ($expr instanceof Node\Scalar\String_) {
+            return $expr->hasAttribute('noLiteralString')
+                ? $this->getInlineString($expr->value)
+                : $this->getLiteralString($expr->value);
+        }
+        $this->unsupportedSyntax($expr);
     }
 
     /**
@@ -2090,7 +2117,7 @@ class CompilerBase implements PropertyAccessContext
 
     protected function getComment(Node\Stmt $v, string $class): string
     {
-        if ($class == 'Stmt_Expression') {
+        if ($v instanceof Node\Stmt\Expression) {
             $class = 'Stmt_Expression(' . $v->expr->getType() . ')';
         }
 
@@ -2438,7 +2465,7 @@ class CompilerBase implements PropertyAccessContext
      */
     protected function parseNumericIdentifier(NodeAbstract $expr): string
     {
-        if ($expr->getType() === 'Scalar_String') {
+        if ($expr instanceof Node\Scalar\String_) {
             if ($this->isFloatStr($expr->value)) {
                 return (string) floatval($expr->value);
             }
@@ -3161,7 +3188,7 @@ class CompilerBase implements PropertyAccessContext
         $type = str_contains($name, '::') ? 'Method' : 'Function';
         if ($argc < $funcDef->argCountRequired) {
             $this->fatalError($expr, $type . ' `' . $name . '()` requires ' . $funcDef->argCountRequired . ' arguments, ' . $argc . ' given');
-        } elseif (!$funcDef->hasVariadicArg() and count($expr->args) > count($funcDef->argInfoList)) {
+        } elseif (!$funcDef->hasVariadicArg() and $argc > count($funcDef->argInfoList)) {
             $this->fatalError($expr, $type . ' `' . $name . '()` accepts ' . count($funcDef->argInfoList) . ' arguments, ' . $argc . ' given');
         }
     }
@@ -3286,11 +3313,12 @@ class CompilerBase implements PropertyAccessContext
             $this->fatalError($expr, 'Method `' . $classDef->getNamespacedName() . '::' . $method . '()` is not accessible');
         }
         // A function-call placeholder, not a real function call.
-        if (count($expr->args) === 1 and $this->isPlaceholderExpr($expr->args[0])) {
+        $args = $expr->getRawArgs();
+        if (count($args) === 1 and $this->isPlaceholderExpr($args[0])) {
             return false;
         }
         if ($checkArgs) {
-            $this->checkNativeCallArgs($expr, $methodDef->functionDef, $expr->args, $classDef->getNamespacedName() . '::' . $method);
+            $this->checkNativeCallArgs($expr, $methodDef->functionDef, $args, $classDef->getNamespacedName() . '::' . $method);
         }
         return $this->getNativeName($method, $classDef->namespace, $classDef->name);
     }

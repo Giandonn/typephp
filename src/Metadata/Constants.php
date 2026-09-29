@@ -350,7 +350,7 @@ class Constants
      * MSVC compiler warning suppression list.
      * These warnings come from Windows SDK and PHP SDK headers and are compiler noise that does not affect functionality.
      *
-     * @var array<string, string> key is the warning number, value is the description
+     * @var array<int, string> key is the warning number, value is the description
      */
     public const array MSVC_SUPPRESSED_WARNINGS = [
         '4244' => '类型转换可能丢失数据 (int -> smaller type)',
