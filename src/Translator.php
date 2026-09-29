@@ -1402,6 +1402,11 @@ class Translator extends Preprocessor
         // Ensure each array has at least one element to remain valid C++ when
         // a project does not use that cache kind.
         $code .= 'struct php_request_cache_storage final {' . PHP_EOL;
+        $code .= $this->getIndent() . 'php_request_cache_storage() = default;' . PHP_EOL;
+        $code .= $this->getIndent() . 'php_request_cache_storage(const php_request_cache_storage &) = delete;' . PHP_EOL;
+        $code .= $this->getIndent() . 'php_request_cache_storage(php_request_cache_storage &&) = delete;' . PHP_EOL;
+        $code .= $this->getIndent() . 'php_request_cache_storage &operator=(const php_request_cache_storage &) = delete;' . PHP_EOL;
+        $code .= $this->getIndent() . 'php_request_cache_storage &operator=(php_request_cache_storage &&) = delete;' . PHP_EOL;
         $code .= $this->getIndent() . 'zend_class_entry *' . self::CLASS_MAP . '['
             . max(1, $this->getStableIdRegistry()->capacity('request-class')) . ']{};' . PHP_EOL;
         $code .= $this->getIndent() . 'zend_function *' . self::FUNC_MAP . '['
