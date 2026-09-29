@@ -277,24 +277,23 @@ By default, the executable is emitted in the directory where `tpc` was invoked.
 Normal and Nano builds share the `build` directory for generated code, objects,
 and other intermediate files. Use `-o` to select a different output path.
 
-PHP and Composer remain build-time tools. On Linux, macOS, iOS, and Android,
-the generated program uses the statically selected Nano runtime and its
-file-only stream layer. Native Nano may use C11, C++17, and POSIX.1-2008, but
-socket/DNS/network, remote streams, dynamic PHP loading, and process execution
-remain unavailable. WASI is a smaller subset; direct calls to APIs missing from
-that target are compile-time errors.
+PHP and Composer remain build-time tools. On Windows, Linux, macOS, iOS, and
+Android, the generated program compiles the selected PHP Nano and PHPX sources
+directly into the final executable or library. It does not import `php.dll`,
+`phpx.dll`, or a host `libphp`/`libphpx`. The runtime retains its file-only
+stream layer; socket/DNS/network, remote streams, dynamic PHP loading, and
+process execution remain unavailable. WASI is a smaller subset; direct calls
+to APIs missing from that target are compile-time errors.
 
 On every platform, `--nano` rejects the VM entry paths `eval`, `include`,
 `include_once`, `require`, and `require_once`, as well as anonymous classes.
 
-Windows supports Nano native applications in `mode: bin` and `mode: lib` through
-a different build backend: it keeps the existing host compile/link pipeline and
-connects to `php.dll` and `phpx.dll` through their import libraries. It does not
-load the `swoole/php-nano` or
-`swoole/phpx` source manifests, nor append their C/C++ files to project `sources`.
-External-command APIs and backtick syntax are still rejected. Those command
-functions are also removed from the Zend function table at request startup, so
-indirect variable/callback calls cannot bypass the policy.
+Windows supports Nano native applications in `mode: bin` and `mode: lib` with
+the same source-composition contract as Linux and macOS. MSVC compiles the C11
+PHP Nano sources, the C++17 PHPX sources, and generated TypePHP sources into one
+PE artifact; only Windows system and compiler-runtime DLLs may remain as normal
+platform dependencies. External-command APIs and backtick syntax are rejected
+by the same Nano capability policy on every platform.
 
 Except for runtime sources, include directories, compile definitions, and link
 inputs, Nano and normal mode share command-line parsing, TypePHP code generation,

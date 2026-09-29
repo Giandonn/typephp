@@ -18,13 +18,12 @@ final class NanoSyntaxValidationVisitor extends NodeVisitorAbstract
     /** @param callable(Node, string): never $fatal */
     public function __construct(
         private readonly mixed $fatal,
-        private readonly bool $phpNanoRuntime = true,
     ) {
     }
 
     public function enterNode(Node $node): ?Node
     {
-        if ($this->phpNanoRuntime && $node instanceof Node\Name) {
+        if ($node instanceof Node\Name) {
             $resolved = $node->getAttribute('resolvedName');
             $className = $resolved instanceof Node\Name
                 ? $resolved->toString()
@@ -60,8 +59,7 @@ final class NanoSyntaxValidationVisitor extends NodeVisitorAbstract
             ($this->fatal)($node, 'Anonymous classes are not supported in nano mode');
         }
 
-        if ($this->phpNanoRuntime
-            && ($node instanceof Node\Expr\Yield_ || $node instanceof Node\Expr\YieldFrom)) {
+        if ($node instanceof Node\Expr\Yield_ || $node instanceof Node\Expr\YieldFrom) {
             ($this->fatal)(
                 $node,
                 'Fiber and Generator are not supported in nano mode because C++17 has no standard stack-switching API',

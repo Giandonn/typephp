@@ -11,6 +11,7 @@ final readonly class ComposerNativePackage
     /**
      * @param list<string> $includeDirs
      * @param list<string> $sources
+     * @param list<string> $defines
      * @param array<string, ComposerNativeComponent> $components
      */
     private function __construct(
@@ -22,6 +23,7 @@ final readonly class ComposerNativePackage
         public int $cxxStandard,
         public array $includeDirs,
         public array $sources,
+        public array $defines,
         public array $components,
         public ?string $extensionName,
         public ?string $extensionModuleEntry,
@@ -29,7 +31,7 @@ final readonly class ComposerNativePackage
     }
 
     /** @return list<self> */
-    public static function discover(?string $compilerRoot = null): array
+    public static function discover(?string $compilerRoot = null, ?string $platformName = null): array
     {
         $packages = [];
         foreach (InstalledVersions::getInstalledPackages() as $package) {
@@ -43,7 +45,7 @@ final readonly class ComposerNativePackage
                 || !is_array($manifest['extra']['typephp-native'] ?? null)) {
                 continue;
             }
-            $packages[] = self::load($package, $compilerRoot);
+            $packages[] = self::load($package, $compilerRoot, $platformName);
         }
 
         usort(
@@ -57,7 +59,11 @@ final readonly class ComposerNativePackage
         return $packages;
     }
 
-    public static function load(string $package, ?string $compilerRoot = null): self
+    public static function load(
+        string $package,
+        ?string $compilerRoot = null,
+        ?string $platformName = null,
+    ): self
     {
         if ($package === 'swoole/php-ext-standard') {
             throw new RuntimeException(
@@ -143,7 +149,28 @@ final readonly class ComposerNativePackage
             );
         }
 
+        $platform = self::platformKey($platformName ?? PHP_OS_FAMILY);
+        $platforms = $native['platforms'] ?? [];
+        if (!is_array($platforms)) {
+            throw new RuntimeException("Invalid native platform metadata in `{$package}`");
+        }
+        $platformNative = $platforms[$platform] ?? [];
+        if (!is_array($platformNative)) {
+            throw new RuntimeException("Invalid native metadata for platform `{$package}:{$platform}`");
+        }
+
         $sources = self::resolveEntries($root, $native['sources'] ?? null, false, $package);
+        if (($platformNative['sources'] ?? []) !== []) {
+            $sources = array_values(array_unique([
+                ...$sources,
+                ...self::resolveEntries(
+                    $root,
+                    $platformNative['sources'],
+                    false,
+                    "{$package}:{$platform}",
+                ),
+            ]));
+        }
         foreach ($sources as $source) {
             $extension = strtolower(pathinfo($source, PATHINFO_EXTENSION));
             if (!in_array($extension, ['c', 'cc', 'cpp', 'cxx'], true)) {
@@ -212,6 +239,34 @@ final readonly class ComposerNativePackage
             );
         }
 
+        $includeDirs = self::resolveEntries($root, $native['include-dirs'] ?? null, true, $package);
+        if (($platformNative['include-dirs'] ?? []) !== []) {
+            $includeDirs = array_values(array_unique([
+                ...$includeDirs,
+                ...self::resolveEntries(
+                    $root,
+                    $platformNative['include-dirs'],
+                    true,
+                    "{$package}:{$platform}",
+                ),
+            ]));
+        }
+        $defines = self::stringList($native['defines'] ?? [], 'define', $package, 'runtime');
+        array_push(
+            $defines,
+            ...self::stringList(
+                $platformNative['defines'] ?? [],
+                'define',
+                $package,
+                $platform,
+            ),
+        );
+        foreach ($defines as $define) {
+            if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*(?:=.*)?$/', $define) !== 1) {
+                throw new RuntimeException("Invalid native define in `{$package}:{$platform}`");
+            }
+        }
+
         return new self(
             $package,
             $root,
@@ -219,12 +274,25 @@ final readonly class ComposerNativePackage
             $abi,
             $cStandard,
             $cxxStandard,
-            self::resolveEntries($root, $native['include-dirs'] ?? null, true, $package),
+            $includeDirs,
             $sources,
+            array_values(array_unique($defines)),
             $components,
             $extensionName,
             $extensionModuleEntry,
         );
+    }
+
+    private static function platformKey(string $platformName): string
+    {
+        return match (strtolower($platformName)) {
+            'windows' => 'windows',
+            'darwin', 'macos' => 'macos',
+            'ios' => 'ios',
+            'android' => 'android',
+            'wasi', 'wasip2', 'wasm32-wasip2' => 'wasip2',
+            default => 'linux',
+        };
     }
 
     /** @return list<string> */

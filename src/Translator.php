@@ -449,7 +449,7 @@ class Translator extends Preprocessor
             ['--march <arch>', 'Target CPU instruction set (for example native or armv8-a)'],
             ['--target-platform <triple>', 'Cross-compilation target triple'],
             ['--wasm[=browser|component]', 'Build WASI component (default) or browser output'],
-            ['--nano', 'Build a Nano application (Windows uses the PHP/PHPX DLL backend)'],
+            ['--nano', 'Build a source-composed Nano application'],
             ['--full-static', 'Link fully statically against the bundled SDK'],
             ['--lto', 'Enable Link Time Optimization (-flto)'],
             ['--no-literal-strings', 'Disable literal string optimization'],
@@ -493,14 +493,16 @@ class Translator extends Preprocessor
             $this->downloadProxy = $proxy;
         }
 
-        // The Nano syntax policy is platform-independent. Windows produces a
-        // native application through the PHP/PHPX DLL backend; other targets
-        // compose the php-nano runtime sources into the artifact.
+        // Every native platform composes the same php-nano and PHPX runtime
+        // sources directly into the output artifact.
         if ($this->climate->arguments->defined('nano')) {
             $this->nanoPolicyMode = true;
             if (NanoBuildBackend::composesRuntimeSources($this->getPlatform()->getName())) {
                 $this->nanoMode = true;
                 $this->noLiteralStrings = true;
+                // Nano is source-composed as NTS on every native host. Do not
+                // fold the build-host PHP_ZTS value into generated programs.
+                $this->internalConstants['PHP_ZTS'] = false;
             }
         }
 
@@ -660,10 +662,7 @@ class Translator extends Preprocessor
                 $this->error('--nano requires the C++17 language standard');
             }
             if ($this->fullStatic) {
-                $message = $this->isNanoMode()
-                    ? '--nano already composes its runtime sources; --full-static is not applicable'
-                    : '--nano on Windows uses the PHP/PHPX DLL backend; --full-static is not supported';
-                $this->error($message);
+                $this->error('--nano already composes its runtime sources; --full-static is not applicable');
             }
             // Nano applications may consume target-owned static libraries.
             // The final executable dependency audit remains the authority on
@@ -1838,30 +1837,6 @@ CODE;
         // module_clean end
 
         $moduleName = $this->getModuleName();
-        $installNanoPolicyHandlers = $this->isNanoPolicyMode()
-            && !$this->isNanoMode()
-            && $this->isBuildModeBin()
-            && $this->hasSapi('embed');
-        if ($installNanoPolicyHandlers) {
-            // Windows Nano uses the full PHP runtime. Keep forbidden process
-            // functions in Zend's persistent table so shutdown boundaries stay
-            // intact, but replace their handlers before generated code runs.
-            // This path is binary/embed-only and executes once per process.
-            $code .= <<<'CODE'
-static void ZEND_FASTCALL typephp_nano_disabled_function(INTERNAL_FUNCTION_PARAMETERS) {
-    const zend_string *name = EX(func)->common.function_name;
-    zend_throw_error(nullptr, "Function `%s` is not supported in nano mode", name ? ZSTR_VAL(name) : "unknown");
-}
-
-static void typephp_disable_nano_function(const char *name, size_t name_length) {
-    auto *function = static_cast<zend_function *>(zend_hash_str_find_ptr(EG(function_table), name, name_length));
-    if (function != nullptr && function->type == ZEND_INTERNAL_FUNCTION) {
-        function->internal_function.handler = typephp_nano_disabled_function;
-    }
-}
-
-CODE;
-        }
         // rinit begin
         $code .= 'PHP_RINIT_FUNCTION(' . $moduleName . ') {' . PHP_EOL;
         $code .= 'if (UNEXPECTED(php_request_cache != nullptr)) {' . PHP_EOL;
@@ -1878,18 +1853,6 @@ CODE;
         $code .= $this->getIndent() . 'return FAILURE;' . PHP_EOL;
         $code .= '}' . PHP_EOL;
         $code .= 'php::request_init();' . PHP_EOL;
-        if ($installNanoPolicyHandlers) {
-            // The full Windows runtime still contains standard/process modules.
-            // Block command functions after every module has
-            // started so variable functions and call_user_func cannot bypass
-            // the compile-time named-call check. Replacing handlers preserves
-            // Zend's persistent function-table layout for embed shutdown.
-            foreach (explode(',', $this->getNanoPolicyDisabledFunctionList()) as $functionName) {
-                $functionArg = $this->genCharPtr($functionName, true);
-                $code .= 'typephp_disable_nano_function(' . $functionArg . ', '
-                    . strlen($functionName) . ');' . PHP_EOL;
-            }
-        }
         $code .= 'module_init();' . PHP_EOL;
 
         if ($this->isBuildModeBin() && $this->hasSapi('embed') && !$this->isNanoMode()) {
@@ -1897,42 +1860,28 @@ CODE;
                 $code .= 'if (strcmp(sapi_module.name, "embed") == 0) {' . PHP_EOL;
             }
             $entryFunction = $this->symbols->function(self::ENTRY_FUNCTION);
-            if ($this->isNanoPolicyMode()) {
-                // Windows keeps the complete PHP/PHPX DLL runtime, but a Nano
-                // executable still enters generated code without ZendVM eval.
-                $code .= $this->registerServerEnvironment($entryFunction->sourceFile);
-                $entryCall = count($entryFunction->argInfoList) === 2
-                    ? 'php_main(php::global("argc").toInt(), php::global("argv").toArray());'
-                    : 'php_main();';
-                $code .= 'try {' . PHP_EOL;
-                $code .= $this->getIndent(2) . $entryCall . PHP_EOL;
-                $code .= '} catch (zend_object *) {' . PHP_EOL;
-                $code .= $this->getIndent(2) . 'return FAILURE;' . PHP_EOL;
-                $code .= '}' . PHP_EOL;
+            // FunctionDef::sourceFile comes from loadFile()'s realpath(), so the
+            // CLI script fields always identify main()'s canonical absolute file.
+            $entryFile = $entryFunction->sourceFile;
+            $entryFileArg = $this->genCharPtr($entryFile, true);
+            $entryLineOffset = max(0, $entryFunction->startLine - 1);
+            if (count($entryFunction->argInfoList) == 2) {
+                $entryScript = 'global $argc, $argv; main($argc, $argv);';
             } else {
-                // FunctionDef::sourceFile comes from loadFile()'s realpath(), so the
-                // CLI script fields always identify main()'s canonical absolute file.
-                $entryFile = $entryFunction->sourceFile;
-                $entryFileArg = $this->genCharPtr($entryFile, true);
-                $entryLineOffset = max(0, $entryFunction->startLine - 1);
-                if (count($entryFunction->argInfoList) == 2) {
-                    $entryScript = 'global $argc, $argv; main($argc, $argv);';
-                } else {
-                    $entryScript = 'main();';
-                }
-
-                $entryScriptArg = $this->genCharPtr($entryScript, true);
-                if ($entryLineOffset > 0) {
-                    // entryLineOffset is main()'s source start line minus one. The
-                    // generated std::string(N, '\n') supplies N padding newlines at
-                    // runtime, so the eval() entry call is reported on main()'s
-                    // original PHP source line. Constructing the padding at runtime
-                    // avoids embedding hundreds of escaped newlines in the C++ file.
-                    $entryScriptArg = 'std::string(' . $entryLineOffset . ", '\\n') + " . $entryScriptArg;
-                }
-
-                $code .= 'php::eval(' . $entryScriptArg . ', ' . $entryFileArg . ');' . PHP_EOL;
+                $entryScript = 'main();';
             }
+
+            $entryScriptArg = $this->genCharPtr($entryScript, true);
+            if ($entryLineOffset > 0) {
+                // entryLineOffset is main()'s source start line minus one. The
+                // generated std::string(N, '\n') supplies N padding newlines at
+                // runtime, so the eval() entry call is reported on main()'s
+                // original PHP source line. Constructing the padding at runtime
+                // avoids embedding hundreds of escaped newlines in the C++ file.
+                $entryScriptArg = 'std::string(' . $entryLineOffset . ", '\\n') + " . $entryScriptArg;
+            }
+
+            $code .= 'php::eval(' . $entryScriptArg . ', ' . $entryFileArg . ');' . PHP_EOL;
             if ($this->isSapiBuild()) {
                 $code .= '}' . PHP_EOL;
             }
@@ -2604,7 +2553,10 @@ CODE;
     /** @param list<string> $generatedSources @return list<string> */
     private function composeNanoRuntimeSources(array $generatedSources): array
     {
-        $composition = (new NanoSourceComposer($this->compilerRuntime->installationRoot))->compose(
+        $composition = (new NanoSourceComposer(
+            $this->compilerRuntime->installationRoot,
+            $this->getPlatform()->getName(),
+        ))->compose(
             $this->getBuildDir(),
             $this->targetName,
             true,
@@ -3057,6 +3009,12 @@ CODE;
             $auditor->assertUndefinedSymbols(
                 'android',
                 $this->captureNativeCommand([$nm, '--undefined-only', $targetFile]),
+            );
+            return;
+        }
+        if ($this->isWindows()) {
+            $auditor->assertWindowsImports(
+                $this->captureNativeCommand(['dumpbin', '/imports', $targetFile]),
             );
             return;
         }
@@ -3581,25 +3539,6 @@ CODE;
                 $header = $this->declarationHeaderFiles[$functionDef->sourceFile] ?? null;
                 if ($header !== null) {
                     $declarationHeaders[] = $header;
-                }
-            }
-            // Nano policy mode (Windows, the WINDOWS_DLL backend) emits a direct
-            // php_main() call inside RINIT instead of relying on ZendVM eval, so
-            // the entry function's declaration header — which carries the
-            // php_main() prototype — must be visible to this translation unit.
-            // True Nano mode keeps php_main() encapsulated inside the separate
-            // nano-entry translation unit, so only the policy path needs this.
-            if ($this->isNanoPolicyMode()
-                && !$this->isNanoMode()
-                && $this->isBuildModeBin()
-                && $this->hasSapi('embed')
-                && $this->hasFunction(self::ENTRY_FUNCTION)
-            ) {
-                $entryHeader = $this->declarationHeaderFiles[
-                    $this->getFunction(self::ENTRY_FUNCTION)->sourceFile
-                ] ?? null;
-                if ($entryHeader !== null && !in_array($entryHeader, $declarationHeaders, true)) {
-                    $declarationHeaders[] = $entryHeader;
                 }
             }
         }
@@ -4844,7 +4783,6 @@ CODE;
         if ($this->isNanoPolicyMode()) {
             $traverser->addVisitor(new NanoSyntaxValidationVisitor(
                 fn (Node $node, string $message) => $this->fatalError($node, $message),
-                $this->isNanoMode(),
             ));
         }
         $traverser->addVisitor(new VoidCastValidationVisitor(

@@ -483,7 +483,6 @@ abstract class Preprocessor extends CompilerBase
             if ($this->isNanoPolicyMode()) {
                 $traverser->addVisitor(new NanoSyntaxValidationVisitor(
                     fn (Node $node, string $message) => $this->fatalError($node, $message),
-                    $this->isNanoMode(),
                 ));
             }
             $traverser->addVisitor(new VoidCastValidationVisitor(

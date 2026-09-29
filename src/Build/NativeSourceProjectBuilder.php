@@ -25,12 +25,6 @@ final class NativeSourceProjectBuilder
     /** @return array{output: string, sourceCount: int, compiledCount: int} */
     public function build(NativeSourceProjectConfig $project): array
     {
-        if ($project->target === 'native' && PHP_OS_FAMILY === 'Windows') {
-            throw new RuntimeException(
-                'php-nano does not target Windows; use TypePHP --nano with the full PHP/PHPX DLL runtime'
-            );
-        }
-
         $this->writeProgress("Preparing Nano {$project->target} build: {$project->name}");
 
         $compiler = $this->resolveExecutable($project->compiler);
@@ -58,7 +52,10 @@ final class NativeSourceProjectBuilder
             $generatedIncludeDir = $generatedDir . DIRECTORY_SEPARATOR . 'include';
         }
 
-        $composition = (new NanoSourceComposer($this->compilerRuntime->installationRoot))->compose(
+        $composition = (new NanoSourceComposer(
+            $this->compilerRuntime->installationRoot,
+            PHP_OS_FAMILY,
+        ))->compose(
             $project->buildDir,
             $this->projectSymbolName($project),
             $project->phpSources !== [],

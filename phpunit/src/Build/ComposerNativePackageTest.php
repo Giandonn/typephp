@@ -72,6 +72,29 @@ final class ComposerNativePackageTest extends TestCase
         );
     }
 
+    public function testLoadsWindowsPlatformSourcesIncludesAndDefines(): void
+    {
+        $this->installFixture(true);
+        mkdir($this->directory . '/windows');
+        file_put_contents($this->directory . '/src/windows.c', 'int typephp_windows(void) { return 1; }');
+
+        $manifestPath = $this->directory . '/composer.json';
+        $manifest = json_decode((string) file_get_contents($manifestPath), true, flags: JSON_THROW_ON_ERROR);
+        $manifest['extra']['typephp-native']['defines'] = ['COMMON=1'];
+        $manifest['extra']['typephp-native']['platforms']['windows'] = [
+            'sources' => ['src/windows.c'],
+            'include-dirs' => ['windows'],
+            'defines' => ['WINDOWS_NATIVE=1'],
+        ];
+        file_put_contents($manifestPath, json_encode($manifest, JSON_THROW_ON_ERROR));
+
+        $package = ComposerNativePackage::load('swoole/php-ext-example', null, 'Windows');
+
+        self::assertContains(realpath($this->directory . '/src/windows.c'), $package->sources);
+        self::assertContains(realpath($this->directory . '/windows'), $package->includeDirs);
+        self::assertSame(['COMMON=1', 'WINDOWS_NATIVE=1'], $package->defines);
+    }
+
     private function installFixture(bool $requireRuntime): void
     {
         $manifest = [

@@ -146,4 +146,30 @@ final class NativeDependencyAuditorTest extends TestCase
         );
         self::addToAssertionCount(1);
     }
+
+    public function testWindowsSystemRuntimeImportsAreAllowed(): void
+    {
+        (new NativeDependencyAuditor())->assertWindowsImports(
+            "    KERNEL32.dll\n    VCRUNTIME140.dll\n    ucrtbase.dll\n",
+        );
+        self::addToAssertionCount(1);
+    }
+
+    public function testWindowsPhpRuntimeDllIsRejected(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('phpx.dll');
+        (new NativeDependencyAuditor())->assertWindowsImports(
+            "    KERNEL32.dll\n    phpx.dll\n",
+        );
+    }
+
+    public function testWindowsForbiddenCapabilityImportIsRejected(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('socket');
+        (new NativeDependencyAuditor())->assertWindowsImports(
+            "    WS2_32.dll\n        123  socket\n",
+        );
+    }
 }

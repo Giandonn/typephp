@@ -335,25 +335,6 @@ abstract class CompilerBase implements PropertyAccessContext
         'syslog',
     ];
 
-    /** Calls forbidden by Nano policy even when the full Windows PHP DLL is used. */
-    private const array NANO_POLICY_UNSUPPORTED_FUNCTIONS = [
-        'exec',
-        'passthru',
-        'pcntl_exec',
-        'popen',
-        'proc_close',
-        'proc_get_status',
-        'proc_nice',
-        'proc_open',
-        'proc_terminate',
-        'shell_exec',
-        'system',
-    ];
-
-    private const array NANO_POLICY_UNSUPPORTED_FUNCTION_PREFIXES = [
-        'proc_',
-    ];
-
     private const array NANO_UNSUPPORTED_FUNCTION_PREFIXES = [
         'pcntl_',
         'posix_',
@@ -964,21 +945,6 @@ abstract class CompilerBase implements PropertyAccessContext
         }
 
         $name = strtolower(ltrim($name, '\\'));
-        if (in_array($name, self::NANO_POLICY_UNSUPPORTED_FUNCTIONS, true)) {
-            $this->fatalError($expr, "Function `{$name}` is not supported in nano mode");
-        }
-        foreach (self::NANO_POLICY_UNSUPPORTED_FUNCTION_PREFIXES as $prefix) {
-            if (str_starts_with($name, $prefix)) {
-                $this->fatalError($expr, "Function `{$name}` is not supported in nano mode");
-            }
-        }
-
-        // Windows Nano uses the complete PHP/PHPX DLL set. Only the common
-        // policy above applies; php-nano's smaller host surface is Unix/WASI.
-        if (!$this->isNanoMode()) {
-            return;
-        }
-
         if (in_array($name, self::NANO_UNSUPPORTED_FUNCTIONS, true)) {
             $this->fatalError($expr, "Function `{$name}` is not supported in nano mode");
         }
@@ -987,11 +953,6 @@ abstract class CompilerBase implements PropertyAccessContext
                 $this->fatalError($expr, "Function `{$name}` is not supported in nano mode");
             }
         }
-    }
-
-    protected function getNanoPolicyDisabledFunctionList(): string
-    {
-        return implode(',', self::NANO_POLICY_UNSUPPORTED_FUNCTIONS);
     }
 
     public function isBuildModeBin(): bool

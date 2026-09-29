@@ -386,7 +386,7 @@ jobs:
               throw "Windows smoke executable failed with exit code $($process.ExitCode)"
           }
           if ($stdout.Trim() -ne 'windows-smoke-ok:zts') {
-              throw "Unexpected Windows smoke output: $stdout"
+            throw "Unexpected Windows smoke output: $stdout"
           }
 
       - name: Run Windows Nano smoke test
@@ -397,7 +397,8 @@ jobs:
           $env:PHPRC = Join-Path $env:PHP_HOME 'php.ini'
           $env:PATH = "$env:PHPX_HOME\build;$env:PATH"
           $nanoExe = Join-Path '${{ github.workspace }}' 'tests\windows\smoke\windows_nano_smoke.exe'
-          & .\tpc.exe tests\windows\smoke\project.yml --nano --output $nanoExe --job 1 --no-progress
+          $nanoBuildDir = Join-Path $env:RUNNER_TEMP 'typephp-windows-nano-console-build'
+          & .\tpc.exe tests\windows\smoke\project.yml --nano --build-dir $nanoBuildDir --output $nanoExe --job 1 --no-progress
           if ($LASTEXITCODE -ne 0) {
               throw "Windows Nano smoke project compilation failed with exit code $LASTEXITCODE"
           }
@@ -407,12 +408,22 @@ jobs:
               throw "Windows Nano smoke executable was not generated: $nanoExe"
           }
 
+          $nanoImports = (& dumpbin.exe /imports $nanoExe | Out-String)
+          if ($LASTEXITCODE -ne 0) {
+              throw "dumpbin failed for Windows Nano executable with exit code $LASTEXITCODE"
+          }
+          if ($nanoImports -match '(?im)^\s*php(?:x|\d.*)?\.dll\s*$') {
+              throw "Windows Nano executable imports a PHP/PHPX runtime DLL:`n$nanoImports"
+          }
+
           $processInfo = [Diagnostics.ProcessStartInfo]::new()
           $processInfo.FileName = $nanoExe
-          $processInfo.ArgumentList.Add('zts')
+          $processInfo.ArgumentList.Add('nts')
           $processInfo.UseShellExecute = $false
           $processInfo.RedirectStandardOutput = $true
           $processInfo.RedirectStandardError = $true
+          $processInfo.Environment['PATH'] = "$env:SystemRoot\System32;$env:SystemRoot"
+          $processInfo.Environment.Remove('PHPRC')
 
           $process = [Diagnostics.Process]::new()
           $process.StartInfo = $processInfo
@@ -429,26 +440,32 @@ jobs:
           if ($process.ExitCode -ne 0) {
               throw "Windows Nano smoke executable failed with exit code $($process.ExitCode)"
           }
-          if ($stdout.Trim() -ne 'windows-smoke-ok:zts') {
-              throw "Unexpected Windows Nano smoke output: $stdout"
+          if ($stdout.Trim() -ne 'windows-smoke-ok:nts') {
+            throw "Unexpected Windows Nano smoke output: $stdout"
           }
 
           $policyInfo = [Diagnostics.ProcessStartInfo]::new()
           $policyInfo.FileName = $nanoExe
-          $policyInfo.ArgumentList.Add('zts')
+          $policyInfo.ArgumentList.Add('nts')
           $policyInfo.ArgumentList.Add('nano')
           $policyInfo.UseShellExecute = $false
           $policyInfo.RedirectStandardOutput = $true
           $policyInfo.RedirectStandardError = $true
+          $policyInfo.Environment['PATH'] = "$env:SystemRoot\System32;$env:SystemRoot"
+          $policyInfo.Environment.Remove('PHPRC')
 
           $policyProcess = [Diagnostics.Process]::new()
           $policyProcess.StartInfo = $policyInfo
           if (-not $policyProcess.Start()) {
               throw 'Unable to start the Windows Nano policy probe'
           }
+          if (-not $policyProcess.WaitForExit(30000)) {
+              $policyProcess.Kill()
+              $policyProcess.WaitForExit()
+              throw 'Windows Nano policy probe timed out'
+          }
           $policyStdout = $policyProcess.StandardOutput.ReadToEnd()
           $policyStderr = $policyProcess.StandardError.ReadToEnd()
-          $policyProcess.WaitForExit()
 
           Write-Host "Windows Nano policy stdout: $policyStdout"
           Write-Host "Windows Nano policy stderr: $policyStderr"
@@ -457,21 +474,30 @@ jobs:
               throw 'Windows Nano policy probe unexpectedly succeeded'
           }
           $policyOutput = "$policyStdout`n$policyStderr"
-          if (-not $policyOutput.Contains('Function `exec` is not supported in nano mode')) {
+          if (-not $policyOutput.Contains("function 'call_user_func' is undefined.")) {
               throw "Windows Nano policy probe returned an unexpected error: $policyOutput"
           }
 
-          # A GUI-subsystem Nano application uses the same generated entry and
-          # DLL backend, but must also link without a console window.
+          # A GUI-subsystem Nano application uses the same source-composed
+          # runtime, but must also link without a console window.
           $nanoGuiExe = Join-Path '${{ github.workspace }}' 'tests\windows\smoke\windows_nano_gui_smoke.exe'
+          $nanoGuiBuildDir = Join-Path $env:RUNNER_TEMP 'typephp-windows-nano-gui-build'
           $env:PHPRC = Join-Path $env:PHP_HOME 'php.ini'
-          & .\tpc.exe tests\windows\smoke\project.yml --nano --no-console --output $nanoGuiExe --job 1 --no-progress
+          & .\tpc.exe tests\windows\smoke\project.yml --nano --no-console --build-dir $nanoGuiBuildDir --output $nanoGuiExe --job 1 --no-progress
           if ($LASTEXITCODE -ne 0) {
               throw "Windows Nano GUI project compilation failed with exit code $LASTEXITCODE"
           }
           Remove-Item Env:PHPRC
           if (-not (Test-Path $nanoGuiExe)) {
               throw "Windows Nano GUI executable was not generated: $nanoGuiExe"
+          }
+          $guiImports = (& dumpbin.exe /imports $nanoGuiExe | Out-String)
+          if ($guiImports -match '(?im)^\s*php(?:x|\d.*)?\.dll\s*$') {
+              throw "Windows Nano GUI executable imports a PHP/PHPX runtime DLL:`n$guiImports"
+          }
+          $guiHeaders = (& dumpbin.exe /headers $nanoGuiExe | Out-String)
+          if ($guiHeaders -notmatch '(?im)^\s*2\s+subsystem\b') {
+              throw "Windows Nano GUI executable is not linked with the Windows GUI subsystem:`n$guiHeaders"
           }
 
       - name: Package tested Windows compiler

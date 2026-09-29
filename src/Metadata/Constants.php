@@ -131,7 +131,7 @@ class Constants
     public const array COMPILER_OPTIONS = [
         'nano' => [
             'longPrefix' => 'nano',
-            'description' => 'Enable VM-free Nano policy (php-nano runtime outside Windows)',
+            'description' => 'Enable the VM-free, source-composed php-nano runtime',
             'required' => false,
             'noValue' => true,
         ],

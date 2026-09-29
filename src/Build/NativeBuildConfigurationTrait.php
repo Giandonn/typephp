@@ -236,7 +236,16 @@ trait NativeBuildConfigurationTrait
     protected function getLibraries(): array
     {
         if ($this->isNanoMode()) {
-            return [];
+            return $this->isWindows()
+                ? [
+                    'advapi32.lib',
+                    'bcrypt.lib',
+                    'pathcch.lib',
+                    'shell32.lib',
+                    'user32.lib',
+                    'ws2_32.lib',
+                ]
+                : [];
         }
 
         $sdkDir = $this->getFullStaticSdkDir();

@@ -8,7 +8,10 @@ use TypePhp\Analysis\CompilationStatistics;
 /** Resolves the Composer-provided runtime sources used by a Nano build. */
 final class NanoSourceComposer
 {
-    public function __construct(private readonly string $compilerRoot)
+    public function __construct(
+        private readonly string $compilerRoot,
+        private readonly string $platformName = PHP_OS_FAMILY,
+    )
     {
     }
 
@@ -29,8 +32,16 @@ final class NanoSourceComposer
         ?CompilationStatistics $statistics = null,
     ): array
     {
-        $runtime = ComposerNativePackage::load('swoole/php-nano', $this->compilerRoot);
-        $phpx = ComposerNativePackage::load('swoole/phpx', $this->compilerRoot);
+        $runtime = ComposerNativePackage::load(
+            'swoole/php-nano',
+            $this->compilerRoot,
+            $this->platformName,
+        );
+        $phpx = ComposerNativePackage::load(
+            'swoole/phpx',
+            $this->compilerRoot,
+            $this->platformName,
+        );
         if ($runtime->abi !== $phpx->abi) {
             throw new RuntimeException(
                 "Native ABI mismatch: swoole/php-nano={$runtime->abi}, swoole/phpx={$phpx->abi}"
@@ -41,7 +52,7 @@ final class NanoSourceComposer
             $runtime->name => $runtime,
             $phpx->name => $phpx,
         ];
-        foreach (ComposerNativePackage::discover($this->compilerRoot) as $package) {
+        foreach (ComposerNativePackage::discover($this->compilerRoot, $this->platformName) as $package) {
             $packagesByName[$package->name] = $package;
         }
         $packages = array_values($packagesByName);
@@ -69,6 +80,7 @@ final class NanoSourceComposer
         $includeDirs = [];
         $defines = [];
         foreach ($packages as $package) {
+            array_push($defines, ...$package->defines);
             if ($package->abi !== $runtime->abi) {
                 throw new RuntimeException(
                     "Native ABI mismatch: {$package->name}={$package->abi}, "

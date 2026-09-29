@@ -1348,7 +1348,7 @@ YAML);
         $this->invokeMethod('applyCommandLineArguments');
     }
 
-    public function testWindowsNanoUsesNativeDllBackendAndRejectsExtensionMode(): void
+    public function testWindowsNanoComposesRuntimeSourcesAndRejectsExtensionMode(): void
     {
         global $argv;
         $argv = ['compiler.php', '--nano'];
@@ -1364,7 +1364,7 @@ YAML);
         $apply->invoke($compiler);
 
         self::assertTrue($compiler->isNanoPolicyMode());
-        self::assertFalse($compiler->isNanoMode());
+        self::assertTrue($compiler->isNanoMode());
 
         $buildMode = $reflection->getProperty('buildMode');
         $buildMode->setAccessible(true);

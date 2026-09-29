@@ -60,7 +60,9 @@ trait NativeCommandOptionsTrait
             'sanitize' => $this->sanitize,
             'march' => $this->march,
             'target_platform' => $this->targetPlatform,
-            'is_zts' => $this->isPhpZts,
+            // Source-composed Nano owns its runtime configuration and uses the
+            // same single-threaded ABI on every native platform.
+            'is_zts' => $this->isNanoMode() ? false : $this->isPhpZts,
             'build_mode' => $this->buildMode,
             'enable_profiler' => $this->enableProfiler,
             'prof_output' => $this->targetName . '.prof',
@@ -187,10 +189,12 @@ trait NativeCommandOptionsTrait
             $ldflags = trim('-static -B ' . escapeshellarg($this->getFullStaticMuslDir()) . ' ' . $ldflags);
         }
         if ($this->isNanoMode()) {
-            $gcSections = ($this->isMacos() || $this->isIosTarget())
-                ? '-Wl,-dead_strip'
-                : '-Wl,--gc-sections';
-            $ldflags = trim($gcSections . ' ' . $ldflags);
+            if (!$this->isWindows()) {
+                $gcSections = ($this->isMacos() || $this->isIosTarget())
+                    ? '-Wl,-dead_strip'
+                    : '-Wl,--gc-sections';
+                $ldflags = trim($gcSections . ' ' . $ldflags);
+            }
             if ($this->isWasiTarget()) {
                 $ldflags = trim(
                     '-fwasm-exceptions -lsetjmp -lunwind ' . $ldflags,
@@ -208,6 +212,7 @@ trait NativeCommandOptionsTrait
             'build_mode' => $this->buildMode,
             'sanitize' => $this->sanitize,
             'lto' => $this->enableLto,
+            'section_gc' => $this->isNanoMode(),
             'target_platform' => $targetPlatform,
             'response_file' => $this->getBuildDir() . DIRECTORY_SEPARATOR . 'cache'
                 . DIRECTORY_SEPARATOR . 'link' . DIRECTORY_SEPARATOR

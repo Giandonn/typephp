@@ -243,20 +243,19 @@ string(16) "Linux ..."
 默认可执行文件生成在执行 `tpc` 时的当前目录；普通模式与 Nano 模式共用
 `build` 目录保存生成代码、目标文件等中间产物。可使用 `-o` 显式修改输出路径。
 
-PHP 与 Composer 仅用于编译期。在 Linux、macOS、iOS、Android 上，生成的程序
-使用静态选定的 Nano 运行时及仅文件模式的 stream。Native Nano 可使用 C11、
-C++17 与 POSIX.1-2008，但依然不提供 socket、DNS、网络、远程 stream、动态 PHP
-加载及进程执行能力。WASI 是更小的能力子集，直接调用目标不支持的 API 会在
-编译期报错。
+PHP 与 Composer 仅用于编译期。在 Windows、Linux、macOS、iOS、Android 上，
+生成程序都会把选中的 PHP Nano 与 PHPX 源码直接编译进最终 exe 或库，不导入
+`php.dll`、`phpx.dll`，也不依赖宿主 `libphp`/`libphpx`。运行时使用仅文件模式的
+stream，依然不提供 socket、DNS、网络、远程 stream、动态 PHP 加载及进程执行
+能力。WASI 是更小的能力子集，直接调用目标不支持的 API 会在编译期报错。
 
 所有平台的 `--nano` 都会拒绝 `eval`、`include`、`include_once`、`require`、
 `require_once` 等 VM 入口以及匿名类。
 
-Windows 通过独立构建后端支持 `mode: bin` 和 `mode: lib` 的 Nano 原生应用：它仍走
-宿主机编译、链接流程，通过 import library 连接 `php.dll` 与 `phpx.dll`。Windows 不加载
-`swoole/php-nano`、`swoole/phpx` 的源码清单，也不会把它们的 C/C++ 源文件加入
-项目 `sources`。外部命令 API 与反引号语法依然会被拒绝；请求启动时还会从 Zend
-函数表移除这些命令函数，避免变量函数或回调形式绕过编译期检查。
+Windows 的 `mode: bin` 和 `mode: lib` 与 Linux、macOS 使用相同的源码组合契约：
+MSVC 将 C11 PHP Nano、C++17 PHPX 与生成的 TypePHP 源码连接为同一个 PE 产物；
+仅允许保留正常的 Windows 系统库和编译器运行库依赖。外部命令 API 与反引号语法
+在所有平台均由相同的 Nano 能力策略拒绝。
 
 除运行时 sources、头文件目录、编译宏和链接输入外，Nano 与普通模式共用同一套
 命令行参数解析、TypePHP 代码生成、并行任务调度、编译进度条、输出路径规则以及
