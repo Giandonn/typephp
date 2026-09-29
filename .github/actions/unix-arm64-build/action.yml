@@ -203,9 +203,31 @@ runs:
 
     - name: Upload platform build outputs
       if: always()
+      id: upload-platform-outputs
+      continue-on-error: true
       uses: actions/upload-artifact@v4
       with:
         name: tpc-${{ inputs.os }}-arm64-php-${{ inputs.php-version }}-zts
+        include-hidden-files: true
+        if-no-files-found: warn
+        retention-days: 7
+        path: |
+          tpc
+          tpc.rsp
+          build/**/*.cc
+          build/**/*.h
+          build/**/*.rsp
+          .github/ci-debug/**
+          .github/smoke/${{ inputs.smoke-directory }}/${{ inputs.smoke-binary }}
+          .github/smoke/${{ inputs.smoke-directory }}/build/**/*.cc
+          .github/smoke/${{ inputs.smoke-directory }}/build/**/*.h
+
+    - name: Retry platform build output upload
+      if: always() && steps.upload-platform-outputs.outcome == 'failure'
+      uses: actions/upload-artifact@v4
+      with:
+        name: tpc-${{ inputs.os }}-arm64-php-${{ inputs.php-version }}-zts
+        overwrite: true
         include-hidden-files: true
         if-no-files-found: warn
         retention-days: 7
