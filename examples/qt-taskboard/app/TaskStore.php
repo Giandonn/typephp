@@ -129,7 +129,7 @@ class TaskStore
             ['title' => '设计桌面应用首页', 'description' => '梳理导航、任务列表与详情面板，让常用操作触手可及。', 'status' => 'done', 'priority' => 'high'],
             ['title' => '完成 TypePHP 任务模型', 'description' => '实现任务校验、状态流转、搜索筛选和 PDO_SQLITE 持久化。', 'status' => 'doing', 'priority' => 'high'],
             ['title' => '连接 Qt Widgets 界面', 'description' => '用原生控件展示任务，并把点击事件送回 PHP。', 'status' => 'doing', 'priority' => 'normal'],
-            ['title' => '验证 Windows 安装包', 'description' => '检查 Qt 插件和 PHP / PHPX 运行库是否齐全。', 'status' => 'todo', 'priority' => 'normal'],
+            ['title' => '验证桌面应用打包', 'description' => '检查 Qt 插件和 PHP / PHPX 运行库是否齐全。', 'status' => 'todo', 'priority' => 'normal'],
             ['title' => '发布第一篇开发文章', 'description' => '加入真实运行截图和完整的构建步骤。', 'status' => 'todo', 'priority' => 'low'],
         ];
         $this->db->beginTransaction();

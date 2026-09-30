@@ -517,7 +517,12 @@ var php_qt_board_create(String title) {
         qt_application->setStyle(QStyleFactory::create("Fusion"));
         qt_application->setApplicationName("TypePHP Taskboard");
         qt_application->setWindowIcon(applicationIcon());
-        qt_application->setFont(QFont("Microsoft YaHei UI", 10));
+        QFont uiFont = qt_application->font();
+#ifdef Q_OS_WIN
+        uiFont.setFamily("Microsoft YaHei UI");
+#endif
+        uiFont.setPointSize(10);
+        qt_application->setFont(uiFont);
         qt_application->setStyleSheet(R"QSS(
             QWidget#root, QWidget#mainArea { background: #F6F7FB; }
             QFrame#sidebar { background: #171A2B; border: 0; }

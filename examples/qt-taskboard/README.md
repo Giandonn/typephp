@@ -19,6 +19,39 @@ php bin/tpc.php examples/qt-taskboard/project.yml --job 2 --no-progress
 ./typephp_taskboard
 ```
 
+## macOS arm64
+
+Tested on Apple Silicon with PHP 8.4.20 ZTS, built-in PDO_SQLITE and Homebrew
+qtbase 6.11.2. Install Xcode, Qt Widgets and build PHPX against the same PHP:
+
+```bash
+brew install qtbase
+export PHP_HOME="$HOME/.phpbrew/php/php-8.4.20-zts"
+export PHPX_HOME="$HOME/workspace/phpx"
+"$PHP_HOME/bin/php" -n -m | grep -E '^(PDO|pdo_sqlite)$'
+"$PHP_HOME/bin/php" -n bin/tpc.php examples/qt-taskboard/project.macos.yml --job 2 --no-progress
+./typephp_taskboard
+```
+
+Run these commands from the compiler repository root. `project.macos.yml` uses
+the Apple Silicon Homebrew framework path `/opt/homebrew/lib`; adjust it for
+another Qt installation. Set `TYPEPHP_TASKBOARD_SCREENSHOT` to a PNG path to
+render the window once, save a screenshot and exit.
+
+macOS launches desktop applications from `.app` bundles. Package the built
+binary, Qt frameworks and plugins, PHP/PHPX libraries and their linked
+dependencies, then launch it through Finder or LaunchServices:
+
+```bash
+sh examples/qt-taskboard/package-macos-app.sh
+open "examples/qt-taskboard/dist/TypePHP Taskboard.app"
+```
+
+`--no-console` only selects the Windows GUI subsystem; it is not needed for
+the macOS bundle. The packaging script applies an ad-hoc signature for local
+testing. Distribution to other Macs requires testing on a clean machine and
+appropriate signing and notarization.
+
 ## Windows
 
 Use a matching x64 MSVC 2022 PHP SDK, PHPX and the Qt 6.8.3 MSVC 2022 x64
