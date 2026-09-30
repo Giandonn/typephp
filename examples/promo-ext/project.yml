@@ -1,0 +1,9 @@
+name: promo
+mode: ext
+version: 1.0.0
+cxx-std: c++17
+sources:
+  - src
+info:
+  Author: TypePHP Demo
+  Description: E-commerce promotion and pricing engine
