@@ -1,0 +1,13 @@
+name: promo-fpm
+mode: bin
+php-version: 8.5
+sapi: fpm
+php-builder:
+  extensions: []
+  zts: off
+sources:
+  - src
+embedded-files:
+  - ./public/index.php
+# 与 project.yml（扩展目标）分开，见 project.yml 中的说明
+build-dir: build/fpm

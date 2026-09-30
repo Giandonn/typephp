@@ -4,6 +4,12 @@ version: 1.0.0
 cxx-std: c++17
 sources:
   - src
+# src/probe.php 是 FPM 集成示例用的并发探针，扩展构建不需要
+ignore:
+  - src/probe.php
+# 两个构建目标共用同一份 src，必须各自使用独立构建目录，
+# 否则同一源文件的中间产物会在两个目标之间串用
+build-dir: build/ext
 info:
   Author: TypePHP Demo
   Description: E-commerce promotion and pricing engine
