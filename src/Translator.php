@@ -2511,20 +2511,27 @@ CODE;
             if ($this->isSapiBuild()) {
                 $sources[] = $this->getPhpxDir() . '/src/misc/typephp_sapi.cc';
             }
-            if ($this->embeddedOpcodeFiles !== []) {
-                $sources[] = $this->getEmbeddedOpcodeDecoderSource();
-            }
+            // typephp_opcode_table.cc calls typephp_opcache_load() from an
+            // unconditional code path, so the decoder object has to take part in
+            // the link even when the project embeds no opcode blob at all.
+            $sources[] = $this->getEmbeddedOpcodeDecoderSource();
         }
         return $sources;
     }
 
     private function getEmbeddedOpcodeDecoderSource(): string
     {
-        // Select the decoder for the PHP CLI that generated the blobs.
-        // Distribution PHP headers need not live under the PHP prefix.
-        $this->getOpcodeBuildExtensionArgs();
-        if (!preg_match('/^8\.(4|5)\./', $this->opcodeBuildPhpVersion, $versionMatch)) {
-            throw new \RuntimeException("Unsupported opcode decoder PHP version: {$this->opcodeBuildPhpVersion}");
+        // Prefer the PHP CLI that generated the blobs. A project that embeds no
+        // opcode blob has no such CLI, but still links the (unused) decoder, so
+        // fall back to the target PHP version the decoder is compiled against.
+        if ($this->opcodeBuildPhpVersion === '') {
+            $this->probeOpcodeBuildExtensionArgs();
+        }
+        $version = $this->opcodeBuildPhpVersion === ''
+            ? $this->phpVersion
+            : $this->opcodeBuildPhpVersion;
+        if (!preg_match('/^8\.(4|5)\./', $version, $versionMatch)) {
+            throw new \RuntimeException("Unsupported opcode decoder PHP version: {$version}");
         }
         return $this->getPhpxDir() . '/thirdparty/opcache/opcode_unserialize_8'
             . $versionMatch[1] . '.c';
