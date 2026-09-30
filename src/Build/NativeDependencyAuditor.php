@@ -66,12 +66,17 @@ final class NativeDependencyAuditor
         }
     }
 
-    public function assertWindowsImports(string $dumpbinOutput): void
+    public function assertWindowsImports(string $importsOutput): void
     {
         $runtimeDlls = [];
         $forbidden = [];
-        foreach (preg_split('/\R/', $dumpbinOutput) ?: [] as $line) {
+        foreach (preg_split('/\R/', $importsOutput) ?: [] as $line) {
             $value = trim($line);
+            // llvm-readobj --coff-imports uses named fields rather than
+            // dumpbin's indented DLL names and symbol columns.
+            if (preg_match('/^(?:Name|Symbol):\s+(\S+)(?:\s+\(\d+\))?$/', $value, $field) === 1) {
+                $value = $field[1];
+            }
             if (preg_match('/^[A-Za-z0-9_.-]+\.dll$/i', $value) === 1
                 && preg_match('/^php(?:x|\d.*)?\.dll$/i', $value) === 1) {
                 $runtimeDlls[strtolower($value)] = true;

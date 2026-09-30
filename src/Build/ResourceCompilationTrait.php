@@ -9,6 +9,7 @@
 namespace TypePhp\Build;
 
 use TypePhp\Backend\Msvc;
+use TypePhp\Backend\Clang;
 use TypePhp\Generator\ResourceFileGenerator;
 
 trait ResourceCompilationTrait
@@ -64,7 +65,7 @@ trait ResourceCompilationTrait
         $this->climate->info('Generated resource file: ' . $rcFile);
 
         $backend = $this->getCompilerBackend();
-        if ($backend instanceof Msvc) {
+        if ($backend instanceof Msvc || $backend instanceof Clang) {
             $resFile = $this->getResourceResFile();
             $inputs = [$rcContent];
             if ($generator !== null) {
@@ -105,7 +106,7 @@ trait ResourceCompilationTrait
             }
             $this->climate->green('Resource compiled: ' . $resFile);
         } else {
-            $this->climate->out('Resource files are only supported with MSVC backend on Windows');
+            $this->climate->out('Resource files require the MSVC or Clang backend on Windows');
         }
     }
 }

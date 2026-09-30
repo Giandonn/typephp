@@ -1,0 +1,6 @@
+name: clang_matrix_lib
+mode: lib
+cxx-std: c++17
+sources:
+  - library.php
+  - lib-src

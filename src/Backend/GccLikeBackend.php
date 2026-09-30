@@ -51,6 +51,11 @@ abstract class GccLikeBackend extends CompilerBackend
         return '-o';
     }
 
+    protected function formatLinkerOutputArgument(string $outputFile): string
+    {
+        return $this->getLinkerOutputFlag() . ' ' . escapeshellarg($outputFile);
+    }
+
     /** Include flag syntax is defined by the compiler driver, not the host platform. */
     protected function formatIncludePaths(array $includePaths): string
     {
@@ -277,7 +282,7 @@ abstract class GccLikeBackend extends CompilerBackend
             $outputFile,
             $options['response_file'] ?? null,
         );
-        $cmd .= ' ' . $this->getLinkerOutputFlag() . ' ' . escapeshellarg($outputFile);
+        $cmd .= ' ' . $this->formatLinkerOutputArgument($outputFile);
 
         if (!empty($options['library_paths'])) {
             $cmd .= ' ' . $this->formatLibraryPaths($options['library_paths']);

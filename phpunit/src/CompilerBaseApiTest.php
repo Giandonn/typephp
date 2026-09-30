@@ -1759,6 +1759,16 @@ YAML);
         $this->assertArrayNotHasKey('precompiled_header', $options->toArray());
         $this->assertFalse($this->compiler->hasMiscObjectFileCache($entry));
 
+        // Composer's source package may differ from PHPX_HOME (for example,
+        // separate NTS and ZTS SDK installations).
+        $composerEntry = '/composer/vendor/swoole/phpx/src/typephp/typephp_main_nano.cc';
+        $this->setPropertyValue('nanoRuntimeSources', [$composerEntry => true]);
+        $composerOptions = $this->invokeMethod('getSourceCompileCommandOptions', $composerEntry, null);
+        $this->assertContains('TYPEPHP_PROJECT_NAME=nano_module_accessor', $composerOptions['user_defines']);
+        $this->assertContains('TYPEPHP_RUNTIME_EXPORTS=1', $composerOptions['user_defines']);
+        $this->assertArrayNotHasKey('forced_include', $composerOptions->toArray());
+        $this->assertArrayNotHasKey('precompiled_header', $composerOptions->toArray());
+
         $nanoCore = dirname($phpxDir) . '/php-nano/src/core.cpp';
         $this->setPropertyValue('nanoRuntimeSources', [$nanoCore => true]);
         $coreOptions = $this->invokeMethod('getSourceCompileCommandOptions', $nanoCore, null);

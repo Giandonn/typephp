@@ -1,0 +1,5 @@
+name: clang_matrix_ext
+mode: ext
+cxx-std: c++17
+sources:
+  - library.php

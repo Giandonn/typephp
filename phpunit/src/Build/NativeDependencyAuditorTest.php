@@ -164,6 +164,32 @@ final class NativeDependencyAuditorTest extends TestCase
         );
     }
 
+    public function testLlvmCoffSystemImportsAreAllowed(): void
+    {
+        (new NativeDependencyAuditor())->assertWindowsImports(
+            "Import {\n  Name: KERNEL32.dll\n  Symbol: GetCurrentProcessId (0)\n}\n",
+        );
+        self::addToAssertionCount(1);
+    }
+
+    public function testLlvmCoffPhpRuntimeDllIsRejected(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('php8ts.dll');
+        (new NativeDependencyAuditor())->assertWindowsImports(
+            "Import {\n  Name: php8ts.dll\n  Symbol: _emalloc (0)\n}\n",
+        );
+    }
+
+    public function testLlvmCoffForbiddenCapabilityIsRejected(): void
+    {
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage('socket');
+        (new NativeDependencyAuditor())->assertWindowsImports(
+            "Import {\n  Name: WS2_32.dll\n  Symbol: socket (0)\n}\n",
+        );
+    }
+
     public function testWindowsForbiddenCapabilityImportIsRejected(): void
     {
         $this->expectException(RuntimeException::class);

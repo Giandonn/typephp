@@ -2566,6 +2566,7 @@ CODE;
             $this->targetName,
             true,
             $this->getCompilationStatistics(),
+            $this->isBuildModeLib(),
         );
         $this->nanoRuntimeIncludePaths = $composition['includeDirs'];
         $this->nanoRuntimeDefines = $composition['defines'];
@@ -3018,8 +3019,18 @@ CODE;
             return;
         }
         if ($this->isWindows()) {
+            $command = ['dumpbin', '/imports', $targetFile];
+            $backend = $this->getCompilerBackend();
+            if ($backend instanceof \TypePhp\Backend\Clang) {
+                $compiler = \TypePhp\Build\ExecutableLocator::resolve(
+                    \TypePhp\Backend\CompilerFactory::getCommandProgram($backend->getCompilerCommand()),
+                );
+                $readobj = $compiler === null ? null
+                    : \TypePhp\Build\ExecutableLocator::resolve(dirname($compiler) . '/llvm-readobj.exe');
+                $command = [$readobj ?? 'llvm-readobj', '--coff-imports', $targetFile];
+            }
             $auditor->assertWindowsImports(
-                $this->captureNativeCommand(['dumpbin', '/imports', $targetFile]),
+                $this->captureNativeCommand($command),
             );
             return;
         }

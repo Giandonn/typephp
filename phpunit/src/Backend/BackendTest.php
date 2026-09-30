@@ -403,8 +403,8 @@ class BackendTest extends TestCase
         $platform = new Windows();
         $compiler = new Clang($platform);
         
-        // Windows 下 Clang 使用 link.exe
-        $this->assertEquals('link', $compiler->getLinkerCommand());
+        // Windows 下 Clang 使用 LLVM 的 COFF 链接器。
+        $this->assertEquals('lld-link', $compiler->getLinkerCommand());
     }
 
     public function testCompilerFactoryKeepsConfiguredCompilerCommand(): void

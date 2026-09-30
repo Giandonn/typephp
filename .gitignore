@@ -29,6 +29,7 @@ tests/**/*.exp
 tests/**/*.log
 tests/**/*.out
 tests/**/*.php
+!tests/windows/clang/*.php
 tests/**/*.sh
 /*.browser/
 /tests/wasm/harness/node_modules/

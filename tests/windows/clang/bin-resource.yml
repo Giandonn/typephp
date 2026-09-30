@@ -1,0 +1,12 @@
+name: clang_matrix_bin
+mode: bin
+cxx-std: c++17
+sources:
+  - bin.php
+  - ../smoke/cpp-src
+resource:
+  version-info:
+    file-version: 1.2.3.4
+    product-version: 1.2.3.4
+    file-description: TypePHP 中文资源测试
+    product-name: TypePHP Clang Matrix

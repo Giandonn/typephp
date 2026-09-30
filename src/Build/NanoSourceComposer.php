@@ -30,6 +30,7 @@ final class NanoSourceComposer
         string $targetName,
         bool $registerProject,
         ?CompilationStatistics $statistics = null,
+        bool $sharedLibrary = false,
     ): array
     {
         $runtime = ComposerNativePackage::load(
@@ -72,6 +73,21 @@ final class NanoSourceComposer
                 $statistics,
                 array_values(array_unique($availableExtensions)),
             );
+        if ($selection !== null && $sharedLibrary && $this->platformName === 'Windows') {
+            // COFF DLLs retain common runtime helpers outside the PHP call
+            // graph. Publish their definitions without enabling unrelated
+            // extensions such as curl or OpenSSL.
+            $selection = new NanoExtensionSelection(
+                $selection->extensions,
+                $selection->completeFallback,
+                array_values(array_unique([
+                    ...$selection->features,
+                    'standard.info', 'standard.encoding',
+                    'standard.filesystem', 'standard.string',
+                ])),
+                $selection->reasons,
+            );
+        }
         $activeComponents = $selection === null
             ? null
             : $this->selectComponents($packages, $selection);

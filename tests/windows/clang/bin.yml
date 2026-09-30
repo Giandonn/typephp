@@ -1,0 +1,6 @@
+name: clang_matrix_bin
+mode: bin
+cxx-std: c++17
+sources:
+  - bin.php
+  - ../smoke/cpp-src

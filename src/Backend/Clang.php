@@ -28,15 +28,15 @@ class Clang extends GccLikeBackend
         }
 
         if ($this->platform instanceof Windows) {
-            return 'link';
+            return 'lld-link';
         }
         return $this->compilerCommand;
     }
 
     /**
-     * On Windows, prefer lld-link; fall back to link.exe if it is not available.
+     * On Windows, use the LLVM linker with the Microsoft ABI.
      */
-    public static function detectWindowsLinker(): string
+    public static function detectWindowsLinker(string $compilerCommand = ''): string
     {
         $output = [];
         $returnCode = 0;
@@ -46,20 +46,34 @@ class Clang extends GccLikeBackend
             return 'lld-link';
         }
 
+        $directories = [];
+        $compiler = \TypePhp\Build\ExecutableLocator::resolve(CompilerFactory::getCommandProgram($compilerCommand));
+        if ($compiler !== null) {
+            $directories[] = dirname($compiler);
+        }
         $llvmHome = getenv('LLVM_HOME');
-        if ($llvmHome && is_dir($llvmHome)) {
-            $lldLinkPath = rtrim($llvmHome, '\/') . '\x64\bin\lld-link.exe';
-            if (file_exists($lldLinkPath)) {
-                exec('"' . $lldLinkPath . '" --version 2>&1', $output, $returnCode);
-                if ($returnCode === 0) {
-                    $lldDir = dirname($lldLinkPath);
-                    putenv("PATH={$lldDir};" . getenv('PATH'));
-                    return 'lld-link';
-                }
+        if ($llvmHome) {
+            $directories[] = rtrim($llvmHome, '\/') . '/bin';
+            $directories[] = rtrim($llvmHome, '\/') . '/x64/bin';
+        }
+        foreach ($directories as $directory) {
+            $lldLinkPath = $directory . '/lld-link.exe';
+            if (is_file($lldLinkPath)) {
+                return escapeshellarg($lldLinkPath);
             }
         }
 
-        return 'link';
+        return 'lld-link';
+    }
+
+    public function compileResourceFile(string $rcFile, string $resFile): string
+    {
+        $compiler = \TypePhp\Build\ExecutableLocator::resolve(CompilerFactory::getCommandProgram($this->compilerCommand));
+        $resourceCompiler = $compiler === null ? null
+            : \TypePhp\Build\ExecutableLocator::resolve(dirname($compiler) . '/llvm-rc.exe');
+        return escapeshellarg($resourceCompiler ?? 'llvm-rc')
+            . ' /C 65001 /FO ' . escapeshellarg($resFile)
+            . ' ' . escapeshellarg($rcFile);
     }
 
     // ──── Hook method overrides ────
@@ -80,6 +94,32 @@ class Clang extends GccLikeBackend
         return $this->platform instanceof Windows ? '/OUT:' : '-o';
     }
 
+    protected function formatLinkerOutputArgument(string $outputFile): string
+    {
+        if ($this->platform instanceof Windows) {
+            return '/OUT:' . escapeshellarg($outputFile);
+        }
+        return parent::formatLinkerOutputArgument($outputFile);
+    }
+
+    protected function buildSharedCompileFlags(array $config, bool $includeCppStd = false): string
+    {
+        $flags = parent::buildSharedCompileFlags($config, $includeCppStd);
+        if ($this->platform instanceof Windows) {
+            // The Windows PHP SDK selects its config and symbol ABI using these
+            // macros. Apply them to C sources and PCHs as well as generated C++.
+            $flags .= ' -DZEND_WIN32 -DPHP_WIN32 -DZEND_DEBUG=0 -DENABLE_INTSAFE_SIGNED_FUNCTIONS';
+            $flags .= ' -fms-runtime-lib=dll';
+            if (!empty($config['debug'])) {
+                $flags .= ' -gcodeview';
+            }
+            if ($config['is_zts'] ?? $this->platform->isZts()) {
+                $flags .= ' -DZTS';
+            }
+        }
+        return $flags;
+    }
+
     protected function formatSanitizerFlag(string $sanitizer): string
     {
         return '-fsanitize=' . $sanitizer;
@@ -88,6 +128,16 @@ class Clang extends GccLikeBackend
     public function getPrecompiledHeaderArtifact(string $headerFile): string
     {
         return dirname($headerFile) . DIRECTORY_SEPARATOR . pathinfo($headerFile, PATHINFO_FILENAME) . '.pch';
+    }
+
+    public function buildLinkOptions(array $config = []): string
+    {
+        if ($this->platform instanceof Windows) {
+            // lld-link reads LLVM bitcode directly. Driver options such as
+            // -flto and --target are not COFF linker options.
+            return $this->getPlatformLinkFlags($config);
+        }
+        return parent::buildLinkOptions($config);
     }
 
     protected function formatPrecompiledHeaderFlag(array $precompiledHeader): string
@@ -117,6 +167,9 @@ class Clang extends GccLikeBackend
                 $flags .= ' ' . $this->platform->getSubsystemOptions(true);
             }
             $flags .= ' ' . $this->platform->getCrtConfig();
+            if (!empty($config['section_gc'])) {
+                $flags .= ' /OPT:REF /OPT:ICF';
+            }
 
             if (!empty($config['build_mode']) && ($config['build_mode'] === 'ext' || $config['build_mode'] === 'lib')) {
                 $flags .= ' /DLL';

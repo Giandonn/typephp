@@ -445,7 +445,9 @@ abstract class Preprocessor extends CompilerBase
             '/',
             $this->getPhpxDir() . '/src/typephp/typephp_main_nano.cc',
         );
-        return $normalizedFile === $nanoLibraryEntry;
+        return $normalizedFile === $nanoLibraryEntry
+            || (isset($this->nanoRuntimeSources[$file])
+                && str_ends_with($normalizedFile, '/src/typephp/typephp_main_nano.cc'));
     }
 
     public function prepareFile(string $file): void

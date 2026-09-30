@@ -50,7 +50,7 @@ class CompilerFactory
         $lowerCommand = strtolower($compilerName);
 
         if (str_contains($normalized, 'clang') || str_contains($lowerCommand, 'clang')) {
-            $linker = $platform instanceof Windows ? Clang::detectWindowsLinker() : null;
+            $linker = $platform instanceof Windows ? Clang::detectWindowsLinker($compilerName) : null;
             return new Clang($platform, $compilerName, $linker);
         }
 
