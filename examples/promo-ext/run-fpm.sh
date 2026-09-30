@@ -70,10 +70,10 @@ mkdir -p "$RUN_DIR" \
 
 # ---------------------------------------------------------------- 1. 构建
 log "构建 php-fpm 产物（project.fpm.yml）"
-if [ -x "$COMPILER_DIR/tpc" ]; then
-    "$COMPILER_DIR/tpc" "$PROJECT_YML" --no-progress -j4 -o "$FPM_BIN"
-else
+if [ -f "$COMPILER_DIR/bin/tpc.php" ]; then
     "$PHP_BIN" "$COMPILER_DIR/bin/tpc.php" "$PROJECT_YML" --no-progress -j4 -o "$FPM_BIN"
+else
+    "$COMPILER_DIR/tpc" "$PROJECT_YML" --no-progress -j4 -o "$FPM_BIN"
 fi
 
 # ---------------------------------------------------------------- 2. 渲染配置

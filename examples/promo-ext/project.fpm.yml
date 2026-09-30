@@ -7,6 +7,8 @@ php-builder:
   zts: off
 sources:
   - src
+# 非编译代码（请求脚本）默认内嵌进二进制，产物自包含、不依赖目标机上的 .php 文件。
+# 代价是改脚本需要重新构建。运行期按构建时的绝对路径匹配，跨机器部署时保持相同路径即可。
 embedded-files:
   - ./public/index.php
 # 与 project.yml（扩展目标）分开，见 project.yml 中的说明

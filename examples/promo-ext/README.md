@@ -70,11 +70,15 @@ runs the concurrency validator and tears everything down. Overridable variables:
 Build only:
 
 ```sh
-./tpc examples/promo-ext/project.fpm.yml --no-progress -j4 -o /tmp/promo_fpm   # from compiler/
+php bin/tpc.php examples/promo-ext/project.fpm.yml --no-progress -j4 -o /tmp/promo_fpm   # from compiler/
 ```
 
 The result is a self-contained FPM binary: PHP 8.5 runtime, the AOT module and the request script
 are all linked in, so it does not need a host PHP on the target machine.
+
+`run-fpm.sh` prefers `php bin/tpc.php` over the packaged `tpc` binary so that it always uses the
+compiler source in this working tree. This example relies on the fix for the opcache decoder link
+error described below, so a packaged `tpc` built before that fix will fail on it.
 
 ### What the concurrency test checks
 
@@ -117,11 +121,14 @@ Measured locally (`pm.max_children = 4`):
 
 **FPM target**
 
-- `embedded-files` is required: with `sapi` builds that declare no embedded file, the compiler
-  compiles `typephp_opcode_table.cc` but does not link `opcode_unserialize_*.c`, which fails with
-  `undefined reference to typephp_opcache_load` (`compiler/src/Translator.php:2509-2516`).
-- The request script is compiled into the binary, so **editing `public/index.php` requires a
-  rebuild**; the docroot copy is not read at runtime.
+- The non-compiled code (the request script) is embedded into the binary through
+  `embedded-files`, so the artifact is self-contained and does not depend on the `.php` file
+  being present on the target machine. Moving `public/index.php` out of the docroot does not
+  break requests — the embedded copy is served.
+- Embedded entries are matched by the absolute path recorded at build time. Keep the deployment
+  path identical (a fixed path inside a container works well); if the request path differs, the
+  runtime falls back to the on-disk file and reports `File not found` when there is none.
+- Because the script is compiled in, **editing `public/index.php` requires a rebuild**.
 - Non-root friendly: the FPM pool sets no `user`/`group` and uses `pm = static`; nginx runs as a
   user-space instance (`nginx -p <prefix> -c <conf>`) on a high port, with logs and temp dirs under
   `RUN_DIR`.
